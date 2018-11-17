@@ -1,9 +1,13 @@
 extern crate byteorder;
+#[macro_use]
+extern crate derive_more;
 
 use std::io::*;
 use std::net::TcpStream;
 
 pub mod command;
+use command::Command;
+
 pub mod message;
 
 fn main() {
@@ -17,18 +21,15 @@ fn main() {
 
     let mut stream = mabye_stream.unwrap();
 
-    let c1 = command::Command {
-        id: None,
-        command_type: command::CommandType::Init,
-        args: vec!(String::from("password=something_long_and_hard_to_guess,compression=off")),
-    };
-    c1.encode(&mut stream).unwrap();
-    let c2 = command::Command {
-        id: None,
-        command_type: command::CommandType::Info,
-        args: vec!(String::from("version")),
-    };
-    c2.encode(&mut stream).unwrap();
+    command::InitCommand::new(
+        None,
+        Some("something_lone_and_hard_to_guess".to_owned()),
+        Some(command::CompressionType::None),
+    ).encode(&mut stream)
+    .unwrap();
+    command::InfoCommand::new(None, "version".to_owned())
+        .encode(&mut stream)
+        .unwrap();
 
     let mut buf: [u8; 256] = [0; 256];
     let mut rcv_cnt = 0;
