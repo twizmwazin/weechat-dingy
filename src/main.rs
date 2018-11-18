@@ -6,7 +6,6 @@ use std::io::*;
 use std::net::TcpStream;
 
 pub mod command;
-use command::Command;
 
 pub mod message;
 

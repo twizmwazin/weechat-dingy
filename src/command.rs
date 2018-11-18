@@ -72,8 +72,8 @@ pub struct InitCommand {
     compression: Option<CompressionType>,
 }
 
-impl Command for InitCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl InitCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("init");
         if self.password.is_some() || self.compression.is_some() {
@@ -97,6 +97,12 @@ impl Command for InitCommand {
     }
 }
 
+impl Command for InitCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 #[derive(Constructor)]
 pub struct HdataCommand {
     id: Option<String>,
@@ -106,8 +112,8 @@ pub struct HdataCommand {
     keys: Option<Vec<String>>,
 }
 
-impl Command for HdataCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl HdataCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res = format!("{}hdata {}:{}", res, self.hdata, self.pointer);
         for v in self.var.iter() {
@@ -123,15 +129,27 @@ impl Command for HdataCommand {
     }
 }
 
+impl Command for HdataCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 #[derive(Constructor)]
 pub struct InfoCommand {
     id: Option<String>,
     name: String,
 }
 
+impl InfoCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        out.write(format!("{}info {}", handle_id(&self.id), self.name).as_bytes())
+    }
+}
+
 impl Command for InfoCommand {
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        out.write(format!("{}info {}", handle_id(&self.id), self.name).as_bytes())
+        self.encode(out)
     }
 }
 
@@ -143,8 +161,8 @@ pub struct InfoListCommand {
     arguments: Option<Vec<String>>,
 }
 
-impl Command for InfoListCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl InfoListCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res = format!("{}infolist {}", res, &self.name);
         if self.pointer.is_some() {
@@ -160,14 +178,20 @@ impl Command for InfoListCommand {
     }
 }
 
+impl Command for InfoListCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 #[derive(Constructor)]
 pub struct NicklistCommand {
     id: Option<String>,
     buffer: Option<String>,
 }
 
-impl Command for NicklistCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl NicklistCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("nicklist");
         if self.buffer.is_some() {
@@ -178,6 +202,12 @@ impl Command for NicklistCommand {
     }
 }
 
+impl Command for NicklistCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 #[derive(Constructor)]
 pub struct InputCommand {
     id: Option<String>,
@@ -185,8 +215,8 @@ pub struct InputCommand {
     data: String,
 }
 
-impl Command for InputCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl InputCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         out.write(
             format!(
                 "{}input {} {}\n",
@@ -195,6 +225,12 @@ impl Command for InputCommand {
                 self.data
             ).as_bytes(),
         )
+    }
+}
+
+impl Command for InputCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
     }
 }
 
@@ -222,8 +258,8 @@ pub struct SyncCommand {
     args: Vec<(String, SyncOption)>,
 }
 
-impl Command for SyncCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl SyncCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res: String = handle_id(&self.id);
         res = format!("{}sync", res);
         if !self.args.is_empty() {
@@ -247,14 +283,20 @@ impl Command for SyncCommand {
     }
 }
 
+impl Command for SyncCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 #[derive(Constructor)]
 pub struct DesyncCommand {
     id: Option<String>,
     args: Vec<(String, SyncOption)>,
 }
 
-impl Command for DesyncCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl DesyncCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res: String = handle_id(&self.id);
         res = format!("{}desync", res);
         if !self.args.is_empty() {
@@ -278,25 +320,36 @@ impl Command for DesyncCommand {
     }
 }
 
+impl Command for DesyncCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 #[derive(Constructor)]
 pub struct TestCommand {
     id: Option<String>,
 }
 
-impl Command for TestCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl TestCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         out.write(format!("{}test\n", handle_id(&self.id)).as_bytes())
     }
 }
 
-#[derive(Constructor)]
+impl Command for TestCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 pub struct PingCommand {
     id: Option<String>,
     arguments: Option<Vec<String>>,
 }
 
-impl Command for PingCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+impl PingCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("ping");
         if self.arguments.is_some() {
@@ -309,14 +362,26 @@ impl Command for PingCommand {
     }
 }
 
+impl Command for PingCommand {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        self.encode(out)
+    }
+}
+
 #[derive(Constructor)]
 pub struct QuitCommand {
     id: Option<String>,
 }
 
+impl QuitCommand {
+    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        out.write(format!("{}quit\n", handle_id(&self.id)).as_bytes())
+    }
+}
+
 impl Command for QuitCommand {
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        out.write(format!("{}quit\n", handle_id(&self.id)).as_bytes())
+        self.encode(out)
     }
 }
 
