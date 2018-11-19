@@ -4,25 +4,40 @@ extern crate derive_more;
 
 use std::io::*;
 use std::net::TcpStream;
+use std::env;
 
 pub mod command;
 
 pub mod message;
 
 fn main() {
-    let password = "something_long_and_hard_to_guess";
-    let mabye_stream = TcpStream::connect("142.44.242.172:34513");
+    let env_server_addr = env::var("server");
+    let env_password = env::var("password");
 
-    if mabye_stream.is_err() {
+    if env_server_addr.is_err() {
+        println!("Need to define env server=<addr:port>");
+        return;
+    }
+    if env_password.is_err() {
+        println!("Need to define env password=relay_passwd");
+        return;
+    }
+
+    let server_addr = env_server_addr.unwrap();
+    let password = env_password.unwrap();
+
+    let maybe_stream = TcpStream::connect(server_addr);
+
+    if maybe_stream.is_err() {
         println!("Problems here");
         return;
     }
 
-    let mut stream = mabye_stream.unwrap();
+    let mut stream = maybe_stream.unwrap();
 
     command::InitCommand::new(
         None,
-        Some("something_lone_and_hard_to_guess".to_owned()),
+        Some(password.to_owned()),
         Some(command::CompressionType::None),
     ).encode(&mut stream)
     .unwrap();
