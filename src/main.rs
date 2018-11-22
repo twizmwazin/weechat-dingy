@@ -1,6 +1,7 @@
 extern crate byteorder;
 #[macro_use]
 extern crate derive_more;
+extern crate libflate;
 
 use std::io::*;
 use std::net::TcpStream;

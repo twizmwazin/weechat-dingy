@@ -6,3 +6,4 @@ authors = ["Kevin Phoenix <kevin@kphoenix.us>"]
 [dependencies]
 byteorder = "1.2.7"
 derive_more = "0.13.0"
+libflate = "0.1"

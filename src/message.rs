@@ -1,6 +1,7 @@
 #![allow(dead_code)]
+use libflate::zlib::Decoder;
 use std::collections::HashMap;
-use std::io::{Error, Read};
+use std::io::{Cursor, Error, Read};
 
 use byteorder::{ByteOrder, BE};
 
@@ -55,35 +56,24 @@ pub struct WeechatError {
     pub message: String,
 }
 
+// Reads three-char type signatures into a String
+fn parse_type_string(read: &mut Read) -> Result<String, Error> {
+    let mut res = String::new();
+    read.take(3).read_to_string(&mut res)?;
+    Ok(res)
+}
+
 // This function will parse all of the types and return a result
 // TODO: implementation
 fn parse_weechat_type(_type: String, read: &mut Read) -> Result<Box<WeechatType>, WeechatError> {
-    let mut _read_res: Result<(), Error> = Ok(());
     match _type.as_ref() {
-        "chr" => {
-            let buf = &mut [0u8; 1];
-            _read_res = read.read_exact(buf);
-            if _read_res.is_err() {
-                return handle_io_error();
-            }
-            Ok(Box::new(WeechatChar(buf[0] as i8)))
-        }
-        "int" => {
-            let buf = &mut [0u8; 4];
-            _read_res = read.read_exact(buf);
-            if _read_res.is_err() {
-                return handle_io_error();
-            }
-            Ok(Box::new(WeechatInt(BE::read_i32(buf))))
-        }
+        "chr" => Ok(parse_chr(read)?),
+        "int" => Ok(parse_int(read)?),
         "lon" => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
         }),
-        "str" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
+        "str" => Ok(parse_str(read)?),
         "buf" => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
@@ -123,6 +113,42 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<Box<WeechatType>
     }
 }
 
+fn parse_chr(read: &mut Read) -> Result<Box<WeechatChar>, WeechatError> {
+    let mut _read_res: Result<(), Error> = Ok(());
+    let buf = &mut [0u8; 1];
+    _read_res = read.read_exact(buf);
+    if _read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    Ok(Box::new(WeechatChar(buf[0] as i8)))
+}
+
+fn parse_int(read: &mut Read) -> Result<Box<WeechatInt>, WeechatError> {
+    let mut _read_res: Result<(), Error> = Ok(());
+    let buf = &mut [0u8; 4];
+    _read_res = read.read_exact(buf);
+    if _read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    Ok(Box::new(WeechatInt(BE::read_i32(buf))))
+}
+
+fn parse_str(read: &mut Read) -> Result<Box<WeechatString>, WeechatError> {
+    let mut _read_res: Result<(), Error> = Ok(());
+    let buf = &mut [0u8; 4];
+    _read_res = read.read_exact(buf);
+    if _read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    let len = BE::read_u32(buf);
+    let mut res = String::new();
+    let str_read_res = read.take(u64::from(len)).read_to_string(&mut res);
+    if str_read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    Ok(Box::new(WeechatString(res)))
+}
+
 //
 // Actual composed Messages
 //
@@ -132,18 +158,64 @@ struct MessageHeader {
     compression: u8,
 }
 
+impl MessageHeader {
+    fn parse(read: &mut Read) -> Self {
+        let len_buf = &mut [0u8; 4];
+        // TODO: error checking?
+        read.read_exact(len_buf).unwrap();
+        let compression = &mut [0u8; 1];
+        read.read_exact(compression).unwrap();
+        MessageHeader {
+            length: BE::read_u32(len_buf),
+            compression: compression[0],
+        }
+    }
+}
+
 struct Message {
     header: MessageHeader,
     id: String,
     data: Vec<Box<WeechatType>>,
 }
 
+impl Message {
+    fn parse(read: &mut Read) -> Result<Message, WeechatError> {
+        let header = MessageHeader::parse(read);
+        let mut buffer = Vec::new();
+        // TODO: error check this
+        read.take(u64::from(header.length) - 5).read_to_end(&mut buffer).unwrap();
+        let decompressed = match header.compression {
+            0 => buffer,
+            1 => {
+                let mut dec = Decoder::new(buffer.as_slice()).unwrap();
+                let mut dec_buf = Vec::new();
+                dec.read_to_end(&mut dec_buf).unwrap();
+                dec_buf
+            }
+            // TODO: error here
+            _ => buffer,
+        };
+        let mut cursor = Cursor::new(decompressed);
+        let id: String = parse_str(&mut cursor)?.0;
+        let mut data = Vec::new();
+        loop {
+            let parse_res = parse_type_string(&mut cursor);
+            if parse_res.is_err() {
+                // TODO: case different situations
+                break;
+            }
+            data.push(parse_weechat_type(parse_res.unwrap(), &mut cursor)?);
+        }
+        Ok(Message { header, id, data })
+    }
+}
+
 //
 // Helper functions
 //
-fn handle_io_error() -> Result<Box<WeechatType>, WeechatError> {
-    Err(WeechatError {
+fn handle_io_error() -> WeechatError {
+    WeechatError {
         error: WeechatErrorType::IoError,
         message: "".to_owned(),
-    })
+    }
 }
