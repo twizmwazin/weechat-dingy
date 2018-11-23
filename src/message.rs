@@ -149,11 +149,9 @@ fn parse_int(read: &mut Read) -> Result<Box<WeechatInt>, WeechatError> {
 }
 
 fn parse_long(read: &mut Read) -> Result<Box<WeechatLong>, WeechatError> {
-    let val = parse_str_int(read, 10);
-    if val.is_err() {
-        return Err(handle_io_error());
-    }
-    Ok(Box::new(WeechatLong(val.unwrap_or(0))))
+    parse_str_int(read, 10).map(|v| {
+        Box::new(WeechatLong(v))
+    })
 }
 
 fn parse_str(read: &mut Read) -> Result<Box<WeechatString>, WeechatError> {
@@ -177,20 +175,15 @@ fn parse_str(read: &mut Read) -> Result<Box<WeechatString>, WeechatError> {
 }
 
 fn parse_ptr(read: &mut Read) -> Result<Box<WeechatPointer>, WeechatError> {
-    let val = parse_str_int(read, 16);
-    if val.is_err() {
-        return Err(handle_io_error());
-    }
-    Ok(Box::new(WeechatPointer(val.unwrap_or(0) as u128)))
+    parse_str_int(read, 16).map(|v| {
+        Box::new(WeechatPointer(v as u128))
+    })
 }
 
 fn parse_time(read: &mut Read) -> Result<Box<WeechatTime>, WeechatError> {
-    let val = parse_str_int(read, 10);
-    if val.is_err() {
-        return Err(handle_io_error());
-    }
-    Ok(Box::new(WeechatTime(val.unwrap_or(0) as u128)))
-
+    parse_str_int(read, 10).map(|v| {
+        Box::new(WeechatTime(v as u128))
+    })
 }
 
 fn parse_inf(read: &mut Read) -> Result<Box<WeechatInfo>, WeechatError> {
