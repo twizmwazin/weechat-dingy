@@ -143,7 +143,7 @@ pub struct InfoCommand {
 
 impl InfoCommand {
     pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        out.write(format!("{}info {}", handle_id(&self.id), self.name).as_bytes())
+        out.write(format!("{}info {}\n", handle_id(&self.id), self.name).as_bytes())
     }
 }
 

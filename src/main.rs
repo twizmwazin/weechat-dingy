@@ -46,17 +46,5 @@ fn main() {
         .encode(&mut stream)
         .unwrap();
 
-    let mut buf: [u8; 256] = [0; 256];
-    let mut rcv_cnt = 0;
-
-    let readed = stream.read(&mut buf);
-
-    if readed.is_err() {
-        println!("Read error lmao");
-        return;
-    }
-
-    rcv_cnt = readed.unwrap_or(0);
-    let buf_slice = &buf[0..rcv_cnt];
-    let msg = message::RelayMessage::from_bytes(buf_slice);
+    let msg = message::Message::parse(&mut stream);
 }

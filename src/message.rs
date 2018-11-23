@@ -94,10 +94,7 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<Box<WeechatType>
             error: WeechatErrorType::UnsupportedType,
             message: _type,
         }),
-        "inf" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
+        "inf" => Ok(parse_inf(read)?),
         "inl" => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
@@ -141,12 +138,32 @@ fn parse_str(read: &mut Read) -> Result<Box<WeechatString>, WeechatError> {
         return Err(handle_io_error());
     }
     let len = BE::read_u32(buf);
+    if len == 0xFFFFFFFF {
+        //Empty string
+        return Ok(Box::new(WeechatString(String::new())));
+    }
     let mut res = String::new();
     let str_read_res = read.take(u64::from(len)).read_to_string(&mut res);
     if str_read_res.is_err() {
         return Err(handle_io_error());
     }
     Ok(Box::new(WeechatString(res)))
+}
+
+fn parse_inf(read: &mut Read) -> Result<Box<WeechatInfo>, WeechatError> {
+    let name = parse_str(read);
+    if name.is_err() {
+        return Err(handle_io_error());
+    }
+    let value = parse_str(read);
+    if value.is_err() {
+        return Err(handle_io_error());
+    }
+
+    let name_str = *name.ok().unwrap();
+    let value_str = *value.ok().unwrap();
+
+    Ok(Box::new(WeechatInfo(name_str.0, value_str.0)))
 }
 
 //
@@ -172,14 +189,14 @@ impl MessageHeader {
     }
 }
 
-struct Message {
+pub struct Message {
     header: MessageHeader,
     id: String,
     data: Vec<Box<WeechatType>>,
 }
 
 impl Message {
-    fn parse(read: &mut Read) -> Result<Message, WeechatError> {
+    pub fn parse(read: &mut Read) -> Result<Message, WeechatError> {
         let header = MessageHeader::parse(read);
         let mut buffer = Vec::new();
         // TODO: error check this
@@ -204,7 +221,8 @@ impl Message {
                 // TODO: case different situations
                 break;
             }
-            data.push(parse_weechat_type(parse_res.unwrap(), &mut cursor)?);
+            let parse = parse_res.unwrap();
+            data.push(parse_weechat_type(parse, &mut cursor)?);
         }
         Ok(Message { header, id, data })
     }
