@@ -25,7 +25,7 @@ pub struct WeechatLong(String);
 pub struct WeechatString(String);
 pub struct WeechatBuffer(Vec<u8>);
 pub struct WeechatPointer(u128);
-pub struct WeechatTime(String);
+pub struct WeechatTime(u128);
 pub struct WeechatHashTable<K: WeechatType, V: WeechatType>(HashMap<K, V>);
 pub struct WeechatHdata(Hdata);
 pub struct WeechatInfo(String, String);
@@ -78,14 +78,8 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<Box<WeechatType>
             error: WeechatErrorType::UnsupportedType,
             message: _type,
         }),
-        "ptr" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
-        "tim" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
+        "ptr" => Ok(parse_ptr(read)?),
+        "tim" => Ok(parse_time(read)?),
         "htb" => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
@@ -148,6 +142,44 @@ fn parse_str(read: &mut Read) -> Result<Box<WeechatString>, WeechatError> {
         return Err(handle_io_error());
     }
     Ok(Box::new(WeechatString(res)))
+}
+
+fn parse_ptr(read: &mut Read) -> Result<Box<WeechatPointer>, WeechatError> {
+    let mut _read_res: Result<(), Error> = Ok(());
+    let buf = &mut [0u8; 1];
+    _read_res = read.read_exact(buf);
+    if _read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    let len = buf[0] as u8;
+    let mut val = String::new();
+    let val_res = read.take(u64::from(len)).read_to_string(&mut val);
+
+    if val_res.is_err() {
+        return Err(handle_io_error());
+    }
+
+    //val is a hex string
+    Ok(Box::new(WeechatPointer(u128::from_str_radix(val.as_str(), 16).unwrap())))
+}
+
+fn parse_time(read: &mut Read) -> Result<Box<WeechatTime>, WeechatError> {
+    let mut _read_res: Result<(), Error> = Ok(());
+    let buf = &mut [0u8; 1];
+    _read_res = read.read_exact(buf);
+    if _read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    let len = buf[0] as u8;
+    let mut val = String::new();
+    let val_res = read.take(u64::from(len)).read_to_string(&mut val);
+
+    if val_res.is_err() {
+        return Err(handle_io_error());
+    }
+
+    //val is a binary string
+    Ok(Box::new(WeechatTime(val.parse::<u128>().unwrap())))
 }
 
 fn parse_inf(read: &mut Read) -> Result<Box<WeechatInfo>, WeechatError> {
