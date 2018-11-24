@@ -45,5 +45,29 @@ fn main() {
         .encode(&mut stream)
         .unwrap();
 
-    let _msg = message::Message::parse(&mut stream);
+    let msg_res = message::Message::parse(&mut stream);
+    if msg_res.is_err() {
+        println!("Parse error");
+        return;
+    }
+
+    let messages = msg_res.ok().unwrap().data;
+    for msg in messages {
+        match msg {
+            message::WeechatType::Char(_) => {},
+            message::WeechatType::Int(_) => {},
+            message::WeechatType::Long(_) => {},
+            message::WeechatType::String(_) => {},
+            message::WeechatType::Buffer(_) => {},
+            message::WeechatType::Pointer(_) => {},
+            message::WeechatType::Time(_) => {},
+            message::WeechatType::HashTable(_) => {},
+            message::WeechatType::Hdata(_) => {},
+            message::WeechatType::Info(name, value) => {
+                println!("Got info: {} = {}", name, value);
+            },
+            message::WeechatType::InfoList(_, _) => {},
+            message::WeechatType::Array(_) => {},
+        }
+    }
 }

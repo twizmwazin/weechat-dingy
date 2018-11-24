@@ -46,7 +46,12 @@ pub struct WeechatError {
 // Reads three-char type signatures into a String
 fn parse_type_string(read: &mut Read) -> Result<String, Error> {
     let mut res = String::new();
-    read.take(3).read_to_string(&mut res)?;
+    let length = read.take(3).read_to_string(&mut res);
+
+    if length.unwrap_or(0) != 3 {
+        return Err(Error::last_os_error());
+    }
+
     Ok(res)
 }
 
@@ -190,7 +195,7 @@ impl MessageHeader {
 pub struct Message {
     header: MessageHeader,
     id: String,
-    data: Vec<WeechatType>,
+    pub data: Vec<WeechatType>,
 }
 
 impl Message {
