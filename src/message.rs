@@ -12,38 +12,25 @@ use byteorder::{ByteOrder, BE};
 pub struct Hdata {
     keys: HashMap<String, String>,
     path: String,
-    items: Vec<HashMap<String, Box<WeechatType>>>,
+    items: Vec<HashMap<String, WeechatType>>,
 }
 
 pub struct InfoListEntry();
 
-pub trait WeechatType {}
-
-pub struct WeechatChar(i8);
-pub struct WeechatInt(i32);
-pub struct WeechatLong(i128);
-pub struct WeechatString(String);
-pub struct WeechatBuffer(Vec<u8>);
-pub struct WeechatPointer(u128);
-pub struct WeechatTime(u128);
-pub struct WeechatHashTable<K: WeechatType, V: WeechatType>(HashMap<K, V>);
-pub struct WeechatHdata(Hdata);
-pub struct WeechatInfo(String, String);
-pub struct WeechatInfoList(String, Vec<(String, Box<WeechatType>)>);
-pub struct WeechatArray<T: WeechatType>(Vec<T>);
-
-impl WeechatType for WeechatChar {}
-impl WeechatType for WeechatInt {}
-impl WeechatType for WeechatLong {}
-impl WeechatType for WeechatString {}
-impl WeechatType for WeechatBuffer {}
-impl WeechatType for WeechatPointer {}
-impl WeechatType for WeechatTime {}
-impl<K: WeechatType, V: WeechatType> WeechatType for WeechatHashTable<K, V> {}
-impl WeechatType for WeechatHdata {}
-impl WeechatType for WeechatInfo {}
-impl WeechatType for WeechatInfoList {}
-impl<T: WeechatType> WeechatType for WeechatArray<T> {}
+pub enum WeechatType {
+    Char(i8),
+    Int(i32),
+    Long(i128),
+    String(String),
+    Buffer(Vec<u8>),
+    Pointer(u128),
+    Time(u128),
+    HashTable(HashMap<WeechatType, WeechatType>),
+    Hdata(Hdata),
+    Info(String, String),
+    InfoList(String, Vec<(String, WeechatType)>),
+    Array(Vec<WeechatType>),
+}
 
 pub enum WeechatErrorType {
     IoError,
@@ -92,7 +79,7 @@ fn parse_str_int(read: &mut Read, radix: u32) -> Result<i128, WeechatError> {
 
 // This function will parse all of the types and return a result
 // TODO: implementation
-fn parse_weechat_type(_type: String, read: &mut Read) -> Result<Box<WeechatType>, WeechatError> {
+fn parse_weechat_type(_type: String, read: &mut Read) -> Result<WeechatType, WeechatError> {
     match _type.as_ref() {
         "chr" => Ok(parse_chr(read)?),
         "int" => Ok(parse_int(read)?),
@@ -128,78 +115,52 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<Box<WeechatType>
     }
 }
 
-fn parse_chr(read: &mut Read) -> Result<Box<WeechatChar>, WeechatError> {
+fn parse_chr(read: &mut Read) -> Result<WeechatType, WeechatError> {
     let mut _read_res: Result<(), Error> = Ok(());
     let buf = &mut [0u8; 1];
     _read_res = read.read_exact(buf);
     if _read_res.is_err() {
         return Err(handle_io_error());
     }
-    Ok(Box::new(WeechatChar(buf[0] as i8)))
+    Ok(WeechatType::Char(buf[0] as i8))
 }
 
-fn parse_int(read: &mut Read) -> Result<Box<WeechatInt>, WeechatError> {
+fn parse_int(read: &mut Read) -> Result<WeechatType, WeechatError> {
     let mut _read_res: Result<(), Error> = Ok(());
     let buf = &mut [0u8; 4];
     _read_res = read.read_exact(buf);
     if _read_res.is_err() {
         return Err(handle_io_error());
     }
-    Ok(Box::new(WeechatInt(BE::read_i32(buf))))
+    Ok(WeechatType::Int(BE::read_i32(buf)))
 }
 
-fn parse_long(read: &mut Read) -> Result<Box<WeechatLong>, WeechatError> {
-    parse_str_int(read, 10).map(|v| {
-        Box::new(WeechatLong(v))
-    })
+fn parse_long(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    Ok(WeechatType::Int(parse_str_int(read, 10)? as i32))
 }
 
-fn parse_str(read: &mut Read) -> Result<Box<WeechatString>, WeechatError> {
-    let mut _read_res: Result<(), Error> = Ok(());
-    let buf = &mut [0u8; 4];
-    _read_res = read.read_exact(buf);
-    if _read_res.is_err() {
-        return Err(handle_io_error());
-    }
-    let len = BE::read_u32(buf);
-    if len == 0xFFFFFFFF {
-        //Empty string
-        return Ok(Box::new(WeechatString(String::new())));
-    }
-    let mut res = String::new();
-    let str_read_res = read.take(u64::from(len)).read_to_string(&mut res);
-    if str_read_res.is_err() {
-        return Err(handle_io_error());
-    }
-    Ok(Box::new(WeechatString(res)))
+fn parse_str(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    Ok(WeechatType::String(parse_str_std(read)?))
 }
 
-fn parse_ptr(read: &mut Read) -> Result<Box<WeechatPointer>, WeechatError> {
-    parse_str_int(read, 16).map(|v| {
-        Box::new(WeechatPointer(v as u128))
-    })
+fn parse_ptr(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    Ok(WeechatType::Pointer(parse_str_int(read, 16)? as u128))
 }
 
-fn parse_time(read: &mut Read) -> Result<Box<WeechatTime>, WeechatError> {
-    parse_str_int(read, 10).map(|v| {
-        Box::new(WeechatTime(v as u128))
-    })
+fn parse_time(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    Ok(WeechatType::Time(parse_str_int(read, 10)? as u128))
 }
 
-fn parse_inf(read: &mut Read) -> Result<Box<WeechatInfo>, WeechatError> {
-    let name = parse_str(read);
-    if name.is_err() {
-        return Err(handle_io_error());
-    }
-    let value = parse_str(read);
-    if value.is_err() {
-        return Err(handle_io_error());
-    }
-
-    let name_str = *name.ok().unwrap();
-    let value_str = *value.ok().unwrap();
-
-    Ok(Box::new(WeechatInfo(name_str.0, value_str.0)))
+fn parse_inf(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    let name = match parse_str_std(read) {
+        Ok(n) => n,
+        Err(_) => return Err(handle_io_error()),
+    };
+    let value = match parse_str_std(read) {
+        Ok(n) => n,
+        Err(_) => return Err(handle_io_error()),
+    };
+    Ok(WeechatType::Info(name, value))
 }
 
 //
@@ -228,7 +189,7 @@ impl MessageHeader {
 pub struct Message {
     header: MessageHeader,
     id: String,
-    data: Vec<Box<WeechatType>>,
+    data: Vec<WeechatType>,
 }
 
 impl Message {
@@ -236,7 +197,9 @@ impl Message {
         let header = MessageHeader::parse(read);
         let mut buffer = Vec::new();
         // TODO: error check this
-        read.take(u64::from(header.length) - 5).read_to_end(&mut buffer).unwrap();
+        read.take(u64::from(header.length) - 5)
+            .read_to_end(&mut buffer)
+            .unwrap();
         let decompressed = match header.compression {
             0 => buffer,
             1 => {
@@ -249,7 +212,7 @@ impl Message {
             _ => buffer,
         };
         let mut cursor = Cursor::new(decompressed);
-        let id: String = parse_str(&mut cursor)?.0;
+        let id: String = parse_str_std(&mut cursor)?;
         let mut data = Vec::new();
         loop {
             let parse_res = parse_type_string(&mut cursor);
@@ -272,4 +235,24 @@ fn handle_io_error() -> WeechatError {
         error: WeechatErrorType::IoError,
         message: "".to_owned(),
     }
+}
+
+fn parse_str_std(read: &mut Read) -> Result<String, WeechatError> {
+    let mut _read_res: Result<(), Error> = Ok(());
+    let buf = &mut [0u8; 4];
+    _read_res = read.read_exact(buf);
+    if _read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    let len = BE::read_u32(buf);
+    if len == 0xFFFFFFFF {
+        //Empty string
+        return Ok(String::new());
+    }
+    let mut res = String::new();
+    let str_read_res = read.take(u64::from(len)).read_to_string(&mut res);
+    if str_read_res.is_err() {
+        return Err(handle_io_error());
+    }
+    Ok(res)
 }
