@@ -85,10 +85,7 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<WeechatType, Wee
         "int" => Ok(parse_int(read)?),
         "lon" => Ok(parse_long(read)?),
         "str" => Ok(parse_str(read)?),
-        "buf" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
+        "buf" => Ok(parse_buf(read)?),
         "ptr" => Ok(parse_ptr(read)?),
         "tim" => Ok(parse_time(read)?),
         "htb" => Err(WeechatError {
@@ -141,6 +138,10 @@ fn parse_long(read: &mut Read) -> Result<WeechatType, WeechatError> {
 
 fn parse_str(read: &mut Read) -> Result<WeechatType, WeechatError> {
     Ok(WeechatType::String(parse_str_std(read)?))
+}
+
+fn parse_buf(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    Ok(WeechatType::Buffer(parse_str_std(read)?.into_bytes()))
 }
 
 fn parse_ptr(read: &mut Read) -> Result<WeechatType, WeechatError> {
