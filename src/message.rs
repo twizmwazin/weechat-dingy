@@ -44,12 +44,15 @@ pub struct WeechatError {
 }
 
 // Reads three-char type signatures into a String
-fn parse_type_string(read: &mut Read) -> Result<String, Error> {
+fn parse_type_string(read: &mut Read) -> Result<String, WeechatError> {
     let mut res = String::new();
     let length = read.take(3).read_to_string(&mut res);
 
     if length.unwrap_or(0) != 3 {
-        return Err(Error::last_os_error());
+        return Err(WeechatError {
+            error: WeechatErrorType::IoError,
+            message: "last os error".to_owned(),
+        });
     }
 
     Ok(res)
@@ -102,14 +105,8 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<WeechatType, Wee
             message: _type,
         }),
         "inf" => parse_inf(read),
-        "inl" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
-        "arr" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
+        "inl" => parse_inl(read),
+        "arr" => parse_arr(read),
         _ => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
@@ -169,6 +166,29 @@ fn parse_inf(read: &mut Read) -> Result<WeechatType, WeechatError> {
     Ok(WeechatType::Info(name, value))
 }
 
+fn parse_inl(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    let name = parse_str_std(read)?;
+    let count = parse_u32(read)?;
+    let mut items = Vec::new();
+    for _ in 0..count {
+        let iname = parse_str_std(read)?;
+        let _type = parse_type_string(read)?;
+        let obj = parse_weechat_type(_type, read)?;
+        items.push((iname, obj));
+    }
+    Ok(WeechatType::InfoList(name, items))
+}
+
+fn parse_arr(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    let _type = parse_type_string(read)?;
+    let len = parse_u32(read)?;
+    let mut res: Vec<WeechatType> = Vec::new();
+    for _ in 0..len {
+        res.push(parse_weechat_type(_type.clone(), read)?);
+    }
+    Ok(WeechatType::Array(res))
+}
+
 //
 // Actual composed Messages
 //
@@ -220,13 +240,7 @@ impl Message {
         let mut cursor = Cursor::new(decompressed);
         let id: String = parse_str_std(&mut cursor)?;
         let mut data = Vec::new();
-        loop {
-            let parse_res = parse_type_string(&mut cursor);
-            if parse_res.is_err() {
-                // TODO: case different situations
-                break;
-            }
-            let parse = parse_res.unwrap();
+        while let Ok(parse) = parse_type_string(&mut cursor) {
             data.push(parse_weechat_type(parse, &mut cursor)?);
         }
         Ok(Message { header, id, data })
@@ -245,12 +259,7 @@ fn handle_io_error() -> WeechatError {
 
 fn parse_str_std(read: &mut Read) -> Result<String, WeechatError> {
     let mut _read_res: Result<(), Error> = Ok(());
-    let buf = &mut [0u8; 4];
-    _read_res = read.read_exact(buf);
-    if _read_res.is_err() {
-        return Err(handle_io_error());
-    }
-    let len = BE::read_u32(buf);
+    let len = parse_u32(read)?;
     if len == 0xFF_FF_FF_FF {
         //Empty string
         return Ok(String::new());
@@ -261,4 +270,12 @@ fn parse_str_std(read: &mut Read) -> Result<String, WeechatError> {
         return Err(handle_io_error());
     }
     Ok(res)
+}
+
+fn parse_u32(read: &mut Read) -> Result<u32, WeechatError> {
+    let buf = &mut [0u8; 4];
+    match read.read_exact(buf) {
+        Ok(_) => Ok(BE::read_u32(buf)),
+        _ => Err(handle_io_error()),
+    }
 }
