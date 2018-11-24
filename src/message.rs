@@ -81,13 +81,13 @@ fn parse_str_int(read: &mut Read, radix: u32) -> Result<i128, WeechatError> {
 // TODO: implementation
 fn parse_weechat_type(_type: String, read: &mut Read) -> Result<WeechatType, WeechatError> {
     match _type.as_ref() {
-        "chr" => Ok(parse_chr(read)?),
-        "int" => Ok(parse_int(read)?),
-        "lon" => Ok(parse_long(read)?),
-        "str" => Ok(parse_str(read)?),
-        "buf" => Ok(parse_buf(read)?),
-        "ptr" => Ok(parse_ptr(read)?),
-        "tim" => Ok(parse_time(read)?),
+        "chr" => parse_chr(read),
+        "int" => parse_int(read),
+        "lon" => parse_lon(read),
+        "str" => parse_str(read),
+        "buf" => parse_buf(read),
+        "ptr" => parse_ptr(read),
+        "tim" => parse_tim(read),
         "htb" => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
@@ -96,7 +96,7 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<WeechatType, Wee
             error: WeechatErrorType::UnsupportedType,
             message: _type,
         }),
-        "inf" => Ok(parse_inf(read)?),
+        "inf" => parse_inf(read),
         "inl" => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
@@ -132,7 +132,7 @@ fn parse_int(read: &mut Read) -> Result<WeechatType, WeechatError> {
     Ok(WeechatType::Int(BE::read_i32(buf)))
 }
 
-fn parse_long(read: &mut Read) -> Result<WeechatType, WeechatError> {
+fn parse_lon(read: &mut Read) -> Result<WeechatType, WeechatError> {
     Ok(WeechatType::Int(parse_str_int(read, 10)? as i32))
 }
 
@@ -148,7 +148,7 @@ fn parse_ptr(read: &mut Read) -> Result<WeechatType, WeechatError> {
     Ok(WeechatType::Pointer(parse_str_int(read, 16)? as u128))
 }
 
-fn parse_time(read: &mut Read) -> Result<WeechatType, WeechatError> {
+fn parse_tim(read: &mut Read) -> Result<WeechatType, WeechatError> {
     Ok(WeechatType::Time(parse_str_int(read, 10)? as u128))
 }
 
