@@ -245,7 +245,7 @@ fn parse_str_std(read: &mut Read) -> Result<String, WeechatError> {
         return Err(handle_io_error());
     }
     let len = BE::read_u32(buf);
-    if len == 0xFFFFFFFF {
+    if len == 0xFF_FF_FF_FF {
         //Empty string
         return Ok(String::new());
     }

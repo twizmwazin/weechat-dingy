@@ -3,7 +3,6 @@ extern crate byteorder;
 extern crate derive_more;
 extern crate libflate;
 
-use std::io::*;
 use std::net::TcpStream;
 use std::env;
 
@@ -46,5 +45,5 @@ fn main() {
         .encode(&mut stream)
         .unwrap();
 
-    let msg = message::Message::parse(&mut stream);
+    let _msg = message::Message::parse(&mut stream);
 }
