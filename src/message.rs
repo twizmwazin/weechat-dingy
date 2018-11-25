@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use libflate::zlib::Decoder;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{Cursor, Error, Read};
 
 use byteorder::{ByteOrder, BE};
@@ -9,16 +9,16 @@ use byteorder::{ByteOrder, BE};
 // Types
 //
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct Hdata {
-    keys: HashMap<String, String>,
+    keys: BTreeMap<String, String>,
     path: String,
-    items: Vec<HashMap<String, WeechatType>>,
+    items: Vec<BTreeMap<String, WeechatType>>,
 }
 
 pub struct InfoListEntry();
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub enum WeechatType {
     Char(i8),
     Int(i32),
@@ -27,7 +27,7 @@ pub enum WeechatType {
     Buffer(Vec<u8>),
     Pointer(u128),
     Time(u128),
-    HashTable(Vec<(WeechatType, WeechatType)>),
+    HashTable(BTreeMap<WeechatType, WeechatType>),
     Hdata(Hdata),
     Info(String, String),
     InfoList(String, Vec<(String, WeechatType)>),
@@ -157,12 +157,12 @@ fn parse_htb(read: &mut Read) -> Result<WeechatType, WeechatError> {
     let key_type = parse_type_string(read)?;
     let val_type = parse_type_string(read)?;
     let count = parse_u32(read)?;
-    let mut htb: Vec<(WeechatType, WeechatType)> = Vec::new();
+    let mut htb: BTreeMap<WeechatType, WeechatType> = BTreeMap::new();
     for _ in 0..count {
-        htb.push((
+        htb.insert(
             parse_weechat_type(key_type.clone(), read)?,
             parse_weechat_type(val_type.clone(), read)?,
-        ));
+        );
     }
     Ok(WeechatType::HashTable(htb))
 }
