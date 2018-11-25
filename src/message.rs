@@ -9,6 +9,7 @@ use byteorder::{ByteOrder, BE};
 // Types
 //
 
+#[derive(Eq, PartialEq)]
 pub struct Hdata {
     keys: HashMap<String, String>,
     path: String,
@@ -17,6 +18,7 @@ pub struct Hdata {
 
 pub struct InfoListEntry();
 
+#[derive(Eq, PartialEq)]
 pub enum WeechatType {
     Char(i8),
     Int(i32),
@@ -25,7 +27,7 @@ pub enum WeechatType {
     Buffer(Vec<u8>),
     Pointer(u128),
     Time(u128),
-    HashTable(HashMap<WeechatType, WeechatType>),
+    HashTable(Vec<(WeechatType, WeechatType)>),
     Hdata(Hdata),
     Info(String, String),
     InfoList(String, Vec<(String, WeechatType)>),
@@ -96,10 +98,7 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<WeechatType, Wee
         "buf" => parse_buf(read),
         "ptr" => parse_ptr(read),
         "tim" => parse_tim(read),
-        "htb" => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-        }),
+        "htb" => parse_htb(read),
         "hda" => Err(WeechatError {
             error: WeechatErrorType::UnsupportedType,
             message: _type,
@@ -152,6 +151,20 @@ fn parse_ptr(read: &mut Read) -> Result<WeechatType, WeechatError> {
 
 fn parse_tim(read: &mut Read) -> Result<WeechatType, WeechatError> {
     Ok(WeechatType::Time(parse_str_int(read, 10)? as u128))
+}
+
+fn parse_htb(read: &mut Read) -> Result<WeechatType, WeechatError> {
+    let key_type = parse_type_string(read)?;
+    let val_type = parse_type_string(read)?;
+    let count = parse_u32(read)?;
+    let mut htb: Vec<(WeechatType, WeechatType)> = Vec::new();
+    for _ in 0..count {
+        htb.push((
+            parse_weechat_type(key_type.clone(), read)?,
+            parse_weechat_type(val_type.clone(), read)?,
+        ));
+    }
+    Ok(WeechatType::HashTable(htb))
 }
 
 fn parse_inf(read: &mut Read) -> Result<WeechatType, WeechatError> {
