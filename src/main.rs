@@ -1,10 +1,11 @@
+extern crate backtrace;
 extern crate byteorder;
 #[macro_use]
 extern crate derive_more;
 extern crate libflate;
 
-use std::net::TcpStream;
 use std::env;
+use std::net::TcpStream;
 
 pub mod command;
 
@@ -35,39 +36,45 @@ fn main() {
 
     let mut stream = maybe_stream.unwrap();
 
-    command::InitCommand::new(
+    let init_command = command::InitCommand::new(
         None,
         Some(password.to_owned()),
         Some(command::CompressionType::None),
-    ).encode(&mut stream)
-    .unwrap();
-    command::InfoCommand::new(None, "version".to_owned())
-        .encode(&mut stream)
-        .unwrap();
+    );
+    init_command.encode(&mut std::io::stdout()).unwrap();
+    init_command.encode(&mut stream).unwrap();
 
-    let msg_res = message::Message::parse(&mut stream);
-    if msg_res.is_err() {
-        println!("Parse error");
-        return;
-    }
+    let test_command = command::TestCommand::new(Some("aaa".into()));
+    test_command.encode(&mut std::io::stdout()).unwrap();
+    test_command.encode(&mut stream).unwrap();
 
-    let messages = msg_res.ok().unwrap().data;
-    for msg in messages {
-        match msg {
-            message::WeechatType::Char(_) => {},
-            message::WeechatType::Int(_) => {},
-            message::WeechatType::Long(_) => {},
-            message::WeechatType::String(_) => {},
-            message::WeechatType::Buffer(_) => {},
-            message::WeechatType::Pointer(_) => {},
-            message::WeechatType::Time(_) => {},
-            message::WeechatType::HashTable(_) => {},
-            message::WeechatType::Hdata(_) => {},
-            message::WeechatType::Info(name, value) => {
-                println!("Got info: {} = {}", name, value);
-            },
-            message::WeechatType::InfoList(_, _) => {},
-            message::WeechatType::Array(_) => {},
+    let ping_command = command::PingCommand::new(None, Some(vec!["abcdefg".into()]));
+    ping_command.encode(&mut std::io::stdout()).unwrap();
+    ping_command.encode(&mut stream).unwrap();
+
+    let info_command = command::InfoCommand::new(None, "version".to_owned());
+    info_command.encode(&mut std::io::stdout()).unwrap();
+    info_command.encode(&mut stream).unwrap();
+
+    let hdata_command = command::HdataCommand::new(
+        Some("HDATA HERE".to_owned()),
+        "buffer".into(),
+        ("gui_buffers".into(), Some(command::HdataCommandLength::Infinite)),
+        vec![],
+        Some(vec!["number".into(), "name".into()]),
+    );
+    hdata_command.encode(&mut std::io::stdout()).unwrap();
+    hdata_command.encode(&mut stream).unwrap();
+
+    loop {
+        match message::Message::parse(&mut stream) {
+            Ok(msg) => {
+                println!("{:?}", msg);
+            }
+            Err(e) => {
+                println!("parse error");
+                println!("{:?}", e);
+            }
         }
     }
 }

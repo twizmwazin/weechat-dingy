@@ -103,26 +103,44 @@ impl Command for InitCommand {
     }
 }
 
+pub enum HdataCommandLength {
+    Infinite,
+    Finite(u32),
+}
+
 #[derive(Constructor)]
 pub struct HdataCommand {
     id: Option<String>,
     hdata: String,
-    pointer: String,
-    var: Vec<String>,
+    pointer: (String, Option<HdataCommandLength>),
+    var: Vec<(String, Option<HdataCommandLength>)>,
     keys: Option<Vec<String>>,
 }
 
 impl HdataCommand {
     pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
-        res = format!("{}hdata {}:{}", res, self.hdata, self.pointer);
+        res = format!("{}hdata {}:{}", res, self.hdata, self.pointer.0);
+
+        if let Some(e) = &self.pointer.1 {
+            res = match e {
+                HdataCommandLength::Infinite => format!("{}(*)", res),
+                HdataCommandLength::Finite(count) => format!("{}({})", res, count),
+            }
+        }
+        //hdata buffer:gui_buffers(*) number,name
+
         for v in self.var.iter() {
-            res = format!("{}/{}", res, v);
+            res = format!("{}/{}", res, v.0);
+            if let Some(e) = &v.1 {
+                res = match e {
+                    HdataCommandLength::Infinite => format!("{}(*)", res),
+                    HdataCommandLength::Finite(count) => format!("{}({})", res, count),
+                }
+            }
         }
         if self.keys.is_some() {
-            for key in self.keys.clone().unwrap() {
-                res = format!("{} {}", res, key);
-            }
+            res = format!("{} {}", res, self.keys.clone().unwrap().join(","));
         }
         res.push('\n');
         out.write(res.as_bytes())
@@ -143,7 +161,8 @@ pub struct InfoCommand {
 
 impl InfoCommand {
     pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        out.write(format!("{}info {}\n", handle_id(&self.id), self.name).as_bytes())
+        let res = format!("{}info {}\n", handle_id(&self.id), self.name);
+        out.write(res.as_bytes())
     }
 }
 
@@ -217,14 +236,13 @@ pub struct InputCommand {
 
 impl InputCommand {
     pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        out.write(
-            format!(
-                "{}input {} {}\n",
-                handle_id(&self.id),
-                self.buffer,
-                self.data
-            ).as_bytes(),
-        )
+        let res = format!(
+            "{}input {} {}\n",
+            handle_id(&self.id),
+            self.buffer,
+            self.data
+        );
+        out.write(res.as_bytes())
     }
 }
 
@@ -333,7 +351,8 @@ pub struct TestCommand {
 
 impl TestCommand {
     pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        out.write(format!("{}test\n", handle_id(&self.id)).as_bytes())
+        let res = format!("{}test\n", handle_id(&self.id));
+        out.write(res.as_bytes())
     }
 }
 
@@ -343,6 +362,7 @@ impl Command for TestCommand {
     }
 }
 
+#[derive(Constructor)]
 pub struct PingCommand {
     id: Option<String>,
     arguments: Option<Vec<String>>,
@@ -354,7 +374,7 @@ impl PingCommand {
         res.push_str("ping");
         if self.arguments.is_some() {
             for arg in self.arguments.clone().unwrap() {
-                res.push_str(arg.as_str());
+                res.push_str(format!(" {}", arg).as_str());
             }
         }
         res.push('\n');
@@ -375,7 +395,8 @@ pub struct QuitCommand {
 
 impl QuitCommand {
     pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        out.write(format!("{}quit\n", handle_id(&self.id)).as_bytes())
+        let res = format!("{}quit\n", handle_id(&self.id));
+        out.write(res.as_bytes())
     }
 }
 
@@ -396,7 +417,7 @@ fn handle_id(id: &Option<String>) -> String {
 }
 
 fn escape_password(input: &str) -> String {
-    // Thos implementation can probably be optimized
+    // This implementation can probably be optimized
     let mut res = String::with_capacity(input.len());
     for c in input.chars() {
         match c {
