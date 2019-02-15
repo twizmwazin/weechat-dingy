@@ -8,8 +8,8 @@ use std::env;
 use std::net::TcpStream;
 
 pub mod command;
-
 pub mod message;
+pub mod sync;
 
 fn main() {
     let env_server_addr = env::var("server");
@@ -44,6 +44,7 @@ fn main() {
     init_command.encode(&mut std::io::stdout()).unwrap();
     init_command.encode(&mut stream).unwrap();
 
+    // TODO: Move test somewhere else
     let test_command = command::TestCommand::new(Some("aaa".into()));
     test_command.encode(&mut std::io::stdout()).unwrap();
     test_command.encode(&mut stream).unwrap();
@@ -66,10 +67,37 @@ fn main() {
     hdata_command.encode(&mut std::io::stdout()).unwrap();
     hdata_command.encode(&mut stream).unwrap();
 
+    let nick_command = command::NicklistCommand::new(Some("nicks".to_owned()), None);
+    nick_command.encode(&mut std::io::stdout()).unwrap();
+    nick_command.encode(&mut stream).unwrap();
+
+    let sync_command = command::SyncCommand::new(None, vec!());
+    sync_command.encode(&mut std::io::stdout()).unwrap();
+    sync_command.encode(&mut stream).unwrap();
+
     loop {
         match message::Message::parse(&mut stream) {
             Ok(msg) => {
-                println!("{:?}", msg);
+                match msg.id.as_str() {
+                    "_buffer_line_added" => {
+                        match &msg.data[0] {
+                            message::WeechatType::Hdata(data) => {
+                                match sync::BufferLineAdded::parse(&data, 0) {
+                                    Ok(bla) => {
+                                        println!("<{}>: {}", bla.prefix.unwrap_or("".to_owned()), bla.message.unwrap_or("".to_owned()));
+                                    },
+                                    Err(e) => {
+                                        println!("{:?}", e);
+                                    }
+                                }
+                            },
+                            _ => {}
+                        }
+                    },
+                    _ => {
+                        println!("{:?}", msg);
+                    }
+                }
             }
             Err(e) => {
                 println!("parse error");

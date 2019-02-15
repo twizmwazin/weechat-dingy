@@ -17,6 +17,12 @@ pub struct Hdata {
     values: Vec<BTreeMap<String, WeechatType>>,
 }
 
+impl Hdata {
+    pub fn get(&self, index: usize, key: String) -> Option<&WeechatType> {
+        return self.values[index].get(&key);
+    }
+}
+
 pub struct InfoListEntry();
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -33,6 +39,47 @@ pub enum WeechatType {
     Info(Option<String>, Option<String>),
     InfoList(Option<String>, Vec<(String, WeechatType)>),
     Array(Vec<WeechatType>),
+}
+
+impl WeechatType {
+    // TODO: Make this generic somehow
+    pub fn unwrap_i8(&self) -> Option<&i8> {
+        return match self { 
+            WeechatType::Char(val) => Some(val),
+            _ => None
+        };
+    }
+    pub fn unwrap_i32(&self) -> Option<&i32> {
+        return match self { 
+            WeechatType::Int(val) => Some(val),
+            _ => None
+        };
+    }
+    pub fn unwrap_i128(&self) -> Option<&i128> {
+        return match self { 
+            WeechatType::Long(val) => Some(val),
+            _ => None
+        };
+    }
+    pub fn unwrap_u128(&self) -> Option<&u128> {
+        return match self { 
+            WeechatType::Pointer(val) => Some(val),
+            WeechatType::Time(val) => Some(val),
+            _ => None
+        };
+    }
+    pub fn unwrap_string(&self) -> Option<&Option<String>> {
+        return match self { 
+            WeechatType::String(val) => Some(val),
+            _ => None
+        };
+    }
+    pub fn unwrap_array(&self) -> Option<&Vec<WeechatType>> {
+        return match self { 
+            WeechatType::Array(val) => Some(val),
+            _ => None
+        };
+    }
 }
 
 #[derive(Debug)]
@@ -270,7 +317,7 @@ impl MessageHeader {
 #[derive(Debug)]
 pub struct Message {
     header: MessageHeader,
-    id: String,
+    pub id: String,
     pub data: Vec<WeechatType>,
 }
 
@@ -293,10 +340,10 @@ impl Message {
             // TODO: error here
             _ => buffer,
         };
-        for byte in decompressed.clone() {
-            print!("{:02X} ", byte);
-        }
-        println!("");
+        // for byte in decompressed.clone() {
+        //     print!("{:02X} ", byte);
+        // }
+        // println!("");
         let mut cursor = Cursor::new(decompressed);
 
         let id: String = match parse_str_std(&mut cursor)? {
