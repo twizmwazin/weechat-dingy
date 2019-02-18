@@ -94,6 +94,23 @@ fn main() {
                             _ => {}
                         }
                     },
+                    "_nicklist" | "nicks" => {
+                        match &msg.data[0] {
+                            message::WeechatType::Hdata(data) => {
+                                for i in 0 .. data.len() {
+                                    match sync::Nicklist::parse(&data, i) {
+                                        Ok(nl) => {
+                                            println!("{:?}", nl);
+                                        },
+                                        Err(e) => {
+                                            println!("{:?}", e);
+                                        }
+                                    }
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
                     _ => {
                         println!("{:?}", msg);
                     }

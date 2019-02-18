@@ -25,6 +25,10 @@ impl Hdata {
         where T: WeechatUnwrappable<T> {
         self.values[index].get(key).and_then(|a| a.unwrap::<T>())
     }
+
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
 }
 
 pub struct InfoListEntry();
@@ -88,6 +92,12 @@ impl<T> WeechatUnwrappable<Vec<T>> for Vec<T>
             WeechatType::Array(array) => array.into_iter().map(|item| T::unwrap(item)).collect::<Option<Vec<T>>>(),
             _ => None
         }
+    }
+}
+
+impl WeechatUnwrappable<bool> for bool {
+    fn unwrap(wt: &WeechatType) -> Option<bool> {
+        wt.unwrap::<i8>().map(|x| x == 1)
     }
 }
 
