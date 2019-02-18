@@ -2,6 +2,7 @@
 use libflate::zlib::Decoder;
 use std::collections::BTreeMap;
 use std::io::{Cursor, Error, Read};
+use std::clone::Clone;
 
 use backtrace::Backtrace;
 use byteorder::{ByteOrder, BE};
@@ -10,7 +11,7 @@ use byteorder::{ByteOrder, BE};
 // Types
 //
 
-#[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
 pub struct Hdata {
     h_path: Vec<String>,
     keys: Vec<(String, String)>,
@@ -18,14 +19,17 @@ pub struct Hdata {
 }
 
 impl Hdata {
-    pub fn get(&self, index: usize, key: String) -> Option<&WeechatType> {
-        return self.values[index].get(&key);
+    //Get value for key at hdata index. Uses WeechatType::unwrap::<T> to return arbitrary types.
+    // Returns None if key not found or if unwrap fails
+    pub fn get<T>(&self, index: usize, key: &'static str) -> Option<T> 
+        where T: WeechatUnwrappable<T> {
+        self.values[index].get(key).and_then(|a| a.unwrap::<T>())
     }
 }
 
 pub struct InfoListEntry();
 
-#[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
 pub enum WeechatType {
     Char(i8),
     Int(i32),
@@ -41,44 +45,58 @@ pub enum WeechatType {
     Array(Vec<WeechatType>),
 }
 
+//Black magic for allowing trait specialization over primitive types to return 
+// non-reference types in the type parameter of an Option<T>
+pub trait WeechatUnwrappable<T> {
+    fn unwrap(wt: &WeechatType) -> Option<T>;
+}
+
+//Basic unwrapping just maps enum variants to types and returns Some(val) if you try
+// to unwrap to a supported type, or None otherwise.
+// Supports variadic matching because of course it does.
+macro_rules! basic_unwrappable {
+    ($type : ty, $($variant : ident), *) => {
+        impl WeechatUnwrappable<$type> for $type {
+            fn unwrap(wt: &WeechatType) -> Option<$type> {
+                match wt {
+                    $(
+                        WeechatType::$variant(val) => Some(val.clone()),
+                    )*
+                    _ => None
+                }
+            }
+        }
+    };
+}
+
+basic_unwrappable!(i8, Char);
+basic_unwrappable!(i32, Int);
+basic_unwrappable!(i128, Long);
+basic_unwrappable!(u128, Pointer, Time);
+basic_unwrappable!(Option<String>, String);
+basic_unwrappable!(Option<Vec<u8>>, Buffer);
+basic_unwrappable!(Vec<WeechatType>, Array);
+
+//Unwrapping for vectors
+impl<T> WeechatUnwrappable<Vec<T>> for Vec<T>
+    where T: WeechatUnwrappable<T> {
+    fn unwrap(wt: &WeechatType) -> Option<Vec<T>> {
+        match wt {
+            //Convert to an iter and then map unwrap (into Vec<Option<T>>)
+            // Then collect into an Option<Vec<T>> which will be None if any of the Option<T>s are None
+            // or Some(Vec<T>()) with the unwrapped contents, otherwise.
+            WeechatType::Array(array) => array.into_iter().map(|item| T::unwrap(item)).collect::<Option<Vec<T>>>(),
+            _ => None
+        }
+    }
+}
+
 impl WeechatType {
-    // TODO: Make this generic somehow
-    pub fn unwrap_i8(&self) -> Option<&i8> {
-        return match self { 
-            WeechatType::Char(val) => Some(val),
-            _ => None
-        };
-    }
-    pub fn unwrap_i32(&self) -> Option<&i32> {
-        return match self { 
-            WeechatType::Int(val) => Some(val),
-            _ => None
-        };
-    }
-    pub fn unwrap_i128(&self) -> Option<&i128> {
-        return match self { 
-            WeechatType::Long(val) => Some(val),
-            _ => None
-        };
-    }
-    pub fn unwrap_u128(&self) -> Option<&u128> {
-        return match self { 
-            WeechatType::Pointer(val) => Some(val),
-            WeechatType::Time(val) => Some(val),
-            _ => None
-        };
-    }
-    pub fn unwrap_string(&self) -> Option<&Option<String>> {
-        return match self { 
-            WeechatType::String(val) => Some(val),
-            _ => None
-        };
-    }
-    pub fn unwrap_array(&self) -> Option<&Vec<WeechatType>> {
-        return match self { 
-            WeechatType::Array(val) => Some(val),
-            _ => None
-        };
+    //Unwrap into a given type, or None if it cannot be mapped.
+    // Supports Vec<T> for arbitrarily nested Vec<>s
+    pub fn unwrap<T>(&self) -> Option<T>
+        where T: WeechatUnwrappable<T> {
+        T::unwrap(self)
     }
 }
 
