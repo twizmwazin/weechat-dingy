@@ -62,7 +62,7 @@ impl BufferLineAdded {
         let message = data.get::<Option<String>>(index, "message");
         let tags_array = data.get::<Vec<Option<String>>>(index, "tags_array");
 
-        //Make sure everything exists
+        // Make sure everything exists
         assert_some_all!(
             buffer,
             date,
@@ -97,7 +97,7 @@ impl Nicklist {
         let prefix = data.get::<Option<String>>(index, "prefix");
         let prefix_color = data.get::<Option<String>>(index, "prefix_color");
 
-        //Make sure everything exists
+        // Make sure everything exists
         assert_some_all!(group, visible, level, name, color, prefix, prefix_color);
 
         Ok(Nicklist {

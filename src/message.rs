@@ -19,7 +19,7 @@ pub struct Hdata {
 }
 
 impl Hdata {
-    //Get value for key at hdata index. Uses WeechatType::unwrap::<T> to return arbitrary types.
+    // Get value for key at hdata index. Uses WeechatType::unwrap::<T> to return arbitrary types.
     // Returns None if key not found or if unwrap fails
     pub fn get<T>(&self, index: usize, key: &'static str) -> Option<T>
     where
@@ -55,13 +55,13 @@ pub enum WeechatType {
     Array(Vec<WeechatType>),
 }
 
-//Black magic for allowing trait specialization over primitive types to return
+// Black magic for allowing trait specialization over primitive types to return
 // non-reference types in the type parameter of an Option<T>
 pub trait WeechatUnwrappable<T> {
     fn unwrap(wt: &WeechatType) -> Option<T>;
 }
 
-//Basic unwrapping just maps enum variants to types and returns Some(val) if you try
+// Basic unwrapping just maps enum variants to types and returns Some(val) if you try
 // to unwrap to a supported type, or None otherwise.
 // Supports variadic matching because of course it does.
 macro_rules! basic_unwrappable {
@@ -87,14 +87,14 @@ basic_unwrappable!(Option<String>, String);
 basic_unwrappable!(Option<Vec<u8>>, Buffer);
 basic_unwrappable!(Vec<WeechatType>, Array);
 
-//Unwrapping for vectors
+// Unwrapping for vectors
 impl<T> WeechatUnwrappable<Vec<T>> for Vec<T>
 where
     T: WeechatUnwrappable<T>,
 {
     fn unwrap(wt: &WeechatType) -> Option<Vec<T>> {
         match wt {
-            //Convert to an iter and then map unwrap (into Vec<Option<T>>)
+            // Convert to an iter and then map unwrap (into Vec<Option<T>>)
             // Then collect into an Option<Vec<T>> which will be None if any of the Option<T>s are None
             // or Some(Vec<T>()) with the unwrapped contents, otherwise.
             WeechatType::Array(array) => array
@@ -113,7 +113,7 @@ impl WeechatUnwrappable<bool> for bool {
 }
 
 impl WeechatType {
-    //Unwrap into a given type, or None if it cannot be mapped.
+    // Unwrap into a given type, or None if it cannot be mapped.
     // Supports Vec<T> for arbitrarily nested Vec<>s
     pub fn unwrap<T>(&self) -> Option<T>
     where
@@ -383,10 +383,6 @@ impl Message {
             // TODO: error here
             _ => buffer,
         };
-        // for byte in decompressed.clone() {
-        //     print!("{:02X} ", byte);
-        // }
-        // println!("");
         let mut cursor = Cursor::new(decompressed);
 
         let id: String = match parse_str_std(&mut cursor)? {
@@ -416,7 +412,7 @@ fn parse_str_std(read: &mut Read) -> Result<Option<String>, WeechatError> {
     let mut _read_res: Result<(), Error> = Ok(());
     let len = parse_u32(read)?;
     if len == 0xFF_FF_FF_FF {
-        //Empty string
+        // Null string
         return Ok(None);
     }
     let mut res = String::new();
