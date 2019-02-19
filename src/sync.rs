@@ -1,4 +1,3 @@
-
 use backtrace::Backtrace;
 use message;
 
@@ -24,7 +23,7 @@ pub struct BufferLineAdded {
     pub highlight: bool,
     pub tags_array: Vec<Option<String>>,
     pub prefix: Option<String>,
-    pub message: Option<String>
+    pub message: Option<String>,
 }
 
 #[derive(Debug)]
@@ -35,7 +34,7 @@ pub struct Nicklist {
     pub name: Option<String>,
     pub color: Option<String>,
     pub prefix: Option<String>,
-    pub prefix_color: Option<String>
+    pub prefix_color: Option<String>,
 }
 
 macro_rules! assert_some_all {
@@ -64,7 +63,16 @@ impl BufferLineAdded {
         let tags_array = data.get::<Vec<Option<String>>>(index, "tags_array");
 
         //Make sure everything exists
-        assert_some_all!(buffer, date, date_printed, displayed, highlight, tags_array, prefix, message);
+        assert_some_all!(
+            buffer,
+            date,
+            date_printed,
+            displayed,
+            highlight,
+            tags_array,
+            prefix,
+            message
+        );
 
         Ok(BufferLineAdded {
             buffer: buffer.unwrap(),
@@ -74,11 +82,10 @@ impl BufferLineAdded {
             highlight: highlight.unwrap(),
             tags_array: tags_array.unwrap(),
             prefix: prefix.unwrap(),
-            message: message.unwrap()
+            message: message.unwrap(),
         })
     }
 }
-
 
 impl Nicklist {
     pub fn parse(data: &message::Hdata, index: usize) -> Result<Nicklist, SyncError> {
@@ -100,8 +107,7 @@ impl Nicklist {
             name: name.unwrap(),
             color: color.unwrap(),
             prefix: prefix.unwrap(),
-            prefix_color: prefix_color.unwrap()
+            prefix_color: prefix_color.unwrap(),
         })
     }
 }
-

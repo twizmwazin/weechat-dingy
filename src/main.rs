@@ -60,7 +60,10 @@ fn main() {
     let hdata_command = command::HdataCommand::new(
         Some("HDATA HERE".to_owned()),
         "buffer".into(),
-        ("gui_buffers".into(), Some(command::HdataCommandLength::Infinite)),
+        (
+            "gui_buffers".into(),
+            Some(command::HdataCommandLength::Infinite),
+        ),
         vec![],
         Some(vec!["number".into(), "name".into()]),
     );
@@ -71,51 +74,49 @@ fn main() {
     nick_command.encode(&mut std::io::stdout()).unwrap();
     nick_command.encode(&mut stream).unwrap();
 
-    let sync_command = command::SyncCommand::new(None, vec!());
+    let sync_command = command::SyncCommand::new(None, vec![]);
     sync_command.encode(&mut std::io::stdout()).unwrap();
     sync_command.encode(&mut stream).unwrap();
 
     loop {
         match message::Message::parse(&mut stream) {
-            Ok(msg) => {
-                match msg.id.as_str() {
-                    "_buffer_line_added" => {
-                        match &msg.data[0] {
-                            message::WeechatType::Hdata(data) => {
-                                match sync::BufferLineAdded::parse(&data, 0) {
-                                    Ok(bla) => {
-                                        println!("<{}>: {}", bla.prefix.unwrap_or("".to_owned()), bla.message.unwrap_or("".to_owned()));
-                                    },
-                                    Err(e) => {
-                                        println!("{:?}", e);
-                                    }
-                                }
-                            },
-                            _ => {}
-                        }
-                    },
-                    "_nicklist" | "nicks" => {
-                        match &msg.data[0] {
-                            message::WeechatType::Hdata(data) => {
-                                for i in 0 .. data.len() {
-                                    match sync::Nicklist::parse(&data, i) {
-                                        Ok(nl) => {
-                                            println!("{:?}", nl);
-                                        },
-                                        Err(e) => {
-                                            println!("{:?}", e);
-                                        }
-                                    }
-                                }
-                            },
-                            _ => {}
+            Ok(msg) => match msg.id.as_str() {
+                "_buffer_line_added" => match &msg.data[0] {
+                    message::WeechatType::Hdata(data) => {
+                        match sync::BufferLineAdded::parse(&data, 0) {
+                            Ok(bla) => {
+                                println!(
+                                    "<{}>: {}",
+                                    bla.prefix.unwrap_or("".to_owned()),
+                                    bla.message.unwrap_or("".to_owned())
+                                );
+                            }
+                            Err(e) => {
+                                println!("{:?}", e);
+                            }
                         }
                     }
-                    _ => {
-                        println!("{:?}", msg);
+                    _ => {}
+                },
+                "_nicklist" | "nicks" => match &msg.data[0] {
+                    message::WeechatType::Hdata(data) => {
+                        for i in 0..data.len() {
+                            match sync::Nicklist::parse(&data, i) {
+                                Ok(nl) => {
+                                    println!("{:?}", nl);
+                                }
+                                Err(e) => {
+                                    println!("{:?}", e);
+                                }
+                            }
+                        }
                     }
+                    _ => {}
+                },
+                _ => {
+                    println!("{:?}", msg);
                 }
-            }
+            },
             Err(e) => {
                 println!("parse error");
                 println!("{:?}", e);

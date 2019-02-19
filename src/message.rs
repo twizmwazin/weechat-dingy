@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 use libflate::zlib::Decoder;
+use std::clone::Clone;
 use std::collections::BTreeMap;
 use std::io::{Cursor, Error, Read};
-use std::clone::Clone;
 
 use backtrace::Backtrace;
 use byteorder::{ByteOrder, BE};
@@ -21,8 +21,10 @@ pub struct Hdata {
 impl Hdata {
     //Get value for key at hdata index. Uses WeechatType::unwrap::<T> to return arbitrary types.
     // Returns None if key not found or if unwrap fails
-    pub fn get<T>(&self, index: usize, key: &'static str) -> Option<T> 
-        where T: WeechatUnwrappable<T> {
+    pub fn get<T>(&self, index: usize, key: &'static str) -> Option<T>
+    where
+        T: WeechatUnwrappable<T>,
+    {
         self.values[index].get(key).and_then(|a| a.unwrap::<T>())
     }
 
@@ -49,7 +51,7 @@ pub enum WeechatType {
     Array(Vec<WeechatType>),
 }
 
-//Black magic for allowing trait specialization over primitive types to return 
+//Black magic for allowing trait specialization over primitive types to return
 // non-reference types in the type parameter of an Option<T>
 pub trait WeechatUnwrappable<T> {
     fn unwrap(wt: &WeechatType) -> Option<T>;
@@ -83,14 +85,19 @@ basic_unwrappable!(Vec<WeechatType>, Array);
 
 //Unwrapping for vectors
 impl<T> WeechatUnwrappable<Vec<T>> for Vec<T>
-    where T: WeechatUnwrappable<T> {
+where
+    T: WeechatUnwrappable<T>,
+{
     fn unwrap(wt: &WeechatType) -> Option<Vec<T>> {
         match wt {
             //Convert to an iter and then map unwrap (into Vec<Option<T>>)
             // Then collect into an Option<Vec<T>> which will be None if any of the Option<T>s are None
             // or Some(Vec<T>()) with the unwrapped contents, otherwise.
-            WeechatType::Array(array) => array.into_iter().map(|item| T::unwrap(item)).collect::<Option<Vec<T>>>(),
-            _ => None
+            WeechatType::Array(array) => array
+                .into_iter()
+                .map(|item| T::unwrap(item))
+                .collect::<Option<Vec<T>>>(),
+            _ => None,
         }
     }
 }
@@ -105,7 +112,9 @@ impl WeechatType {
     //Unwrap into a given type, or None if it cannot be mapped.
     // Supports Vec<T> for arbitrarily nested Vec<>s
     pub fn unwrap<T>(&self) -> Option<T>
-        where T: WeechatUnwrappable<T> {
+    where
+        T: WeechatUnwrappable<T>,
+    {
         T::unwrap(self)
     }
 }
@@ -223,7 +232,9 @@ fn parse_str(read: &mut Read) -> Result<WeechatType, WeechatError> {
 }
 
 fn parse_buf(read: &mut Read) -> Result<WeechatType, WeechatError> {
-    Ok(WeechatType::Buffer(parse_str_std(read)?.map(|s| s.into_bytes())))
+    Ok(WeechatType::Buffer(
+        parse_str_std(read)?.map(|s| s.into_bytes()),
+    ))
 }
 
 fn parse_ptr(read: &mut Read) -> Result<WeechatType, WeechatError> {
@@ -252,14 +263,14 @@ fn parse_hda(read: &mut Read) -> Result<WeechatType, WeechatError> {
     let h_path = parse_hda_path(read)?;
     let keys = parse_hda_keys(read)?;
     let count = parse_u32(read)?;
-    let mut values : Vec<BTreeMap<String, WeechatType>> = Vec::new();
+    let mut values: Vec<BTreeMap<String, WeechatType>> = Vec::new();
 
     for _ in 0..count {
         let mut p_path = Vec::new();
         for _ in 0..h_path.len() {
             p_path.push(parse_ptr(read)?);
         }
-        let mut vals : BTreeMap<String, WeechatType> = BTreeMap::new();
+        let mut vals: BTreeMap<String, WeechatType> = BTreeMap::new();
         for v in &keys {
             vals.insert(v.0.clone(), parse_weechat_type(v.1.clone(), read)?);
         }
