@@ -2,6 +2,7 @@
 name = "weechat-dingy"
 version = "0.1.0"
 authors = ["Kevin Phoenix <kevin@kphoenix.us>", "Glenn Smith <couleeapps@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 backtrace = "0.3"

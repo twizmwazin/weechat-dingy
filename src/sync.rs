@@ -1,5 +1,5 @@
+use crate::message;
 use backtrace::Backtrace;
-use message;
 
 #[derive(Debug)]
 pub enum SyncErrorType {
