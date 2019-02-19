@@ -78,14 +78,14 @@ fn main() {
     loop {
         match message::Message::parse(&mut stream) {
             Ok(msg) => match msg.id.as_str() {
-                "_buffer_line_added" => match &msg.data[0] {
-                    message::WeechatType::Hdata(data) => {
+                "_buffer_line_added" => {
+                    if let message::WeechatType::Hdata(data) = &msg.data[0] {
                         match sync::BufferLineAdded::parse(&data, 0) {
                             Ok(bla) => {
                                 println!(
                                     "<{}>: {}",
-                                    bla.prefix.unwrap_or("".to_owned()),
-                                    bla.message.unwrap_or("".to_owned())
+                                    bla.prefix.unwrap_or_default(),
+                                    bla.message.unwrap_or_default()
                                 );
                             }
                             Err(e) => {
@@ -93,10 +93,9 @@ fn main() {
                             }
                         }
                     }
-                    _ => {}
-                },
-                "_nicklist" | "nicks" => match &msg.data[0] {
-                    message::WeechatType::Hdata(data) => {
+                }
+                "_nicklist" | "nicks" => {
+                    if let message::WeechatType::Hdata(data) = &msg.data[0] {
                         for i in 0..data.len() {
                             match sync::Nicklist::parse(&data, i) {
                                 Ok(nl) => {
@@ -108,8 +107,7 @@ fn main() {
                             }
                         }
                     }
-                    _ => {}
-                },
+                }
                 _ => {
                     println!("{:?}", msg);
                 }

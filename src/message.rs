@@ -31,6 +31,10 @@ impl Hdata {
     pub fn len(&self) -> usize {
         self.values.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
 }
 
 pub struct InfoListEntry();
@@ -94,7 +98,7 @@ where
             // Then collect into an Option<Vec<T>> which will be None if any of the Option<T>s are None
             // or Some(Vec<T>()) with the unwrapped contents, otherwise.
             WeechatType::Array(array) => array
-                .into_iter()
+                .iter()
                 .map(|item| T::unwrap(item))
                 .collect::<Option<Vec<T>>>(),
             _ => None,
