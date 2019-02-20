@@ -1,5 +1,7 @@
 use crate::message;
 use backtrace::Backtrace;
+use message;
+use message::WeechatString;
 
 #[derive(Debug)]
 pub enum SyncErrorType {
@@ -21,9 +23,9 @@ pub struct BufferLineAdded {
     pub date_printed: u128,
     pub displayed: bool,
     pub highlight: bool,
-    pub tags_array: Vec<Option<String>>,
-    pub prefix: Option<String>,
-    pub message: Option<String>,
+    pub tags_array: Vec<WeechatString>,
+    pub prefix: WeechatString,
+    pub message: WeechatString,
 }
 
 #[derive(Debug)]
@@ -31,10 +33,10 @@ pub struct Nicklist {
     pub group: bool,
     pub visible: bool,
     pub level: i32,
-    pub name: Option<String>,
-    pub color: Option<String>,
-    pub prefix: Option<String>,
-    pub prefix_color: Option<String>,
+    pub name: WeechatString,
+    pub color: WeechatString,
+    pub prefix: WeechatString,
+    pub prefix_color: WeechatString,
 }
 
 macro_rules! assert_some_all {
@@ -58,9 +60,9 @@ impl BufferLineAdded {
         let date_printed = data.get::<u128>(index, "date_printed");
         let displayed = data.get::<bool>(index, "displayed");
         let highlight = data.get::<bool>(index, "highlight");
-        let prefix = data.get::<Option<String>>(index, "prefix");
-        let message = data.get::<Option<String>>(index, "message");
-        let tags_array = data.get::<Vec<Option<String>>>(index, "tags_array");
+        let prefix = data.get::<WeechatString>(index, "prefix");
+        let message = data.get::<WeechatString>(index, "message");
+        let tags_array = data.get::<Vec<WeechatString>>(index, "tags_array");
 
         // Make sure everything exists
         assert_some_all!(
@@ -92,10 +94,10 @@ impl Nicklist {
         let group = data.get::<bool>(index, "group");
         let visible = data.get::<bool>(index, "visible");
         let level = data.get::<i32>(index, "level");
-        let name = data.get::<Option<String>>(index, "name");
-        let color = data.get::<Option<String>>(index, "color");
-        let prefix = data.get::<Option<String>>(index, "prefix");
-        let prefix_color = data.get::<Option<String>>(index, "prefix_color");
+        let name = data.get::<WeechatString>(index, "name");
+        let color = data.get::<WeechatString>(index, "color");
+        let prefix = data.get::<WeechatString>(index, "prefix");
+        let prefix_color = data.get::<WeechatString>(index, "prefix_color");
 
         // Make sure everything exists
         assert_some_all!(group, visible, level, name, color, prefix, prefix_color);

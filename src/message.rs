@@ -40,18 +40,42 @@ impl Hdata {
 pub struct InfoListEntry();
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
+pub enum WeechatString {
+    Null,
+    Str(String),
+}
+
+impl WeechatString {
+    pub fn map<T, F>(self, func: F) -> Option<T>
+    where F: FnOnce(String) -> T
+    {
+        match self {
+            WeechatString::Null => None,
+            WeechatString::Str(s) => Some(func(s))
+        }
+    }
+
+    pub fn to_str(self) -> String {
+        match self {
+            WeechatString::Null => "(null)".to_owned(),
+            WeechatString::Str(s) => s
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
 pub enum WeechatType {
     Char(i8),
     Int(i32),
     Long(i128),
-    String(Option<String>),
+    String(WeechatString),
     Buffer(Option<Vec<u8>>),
     Pointer(u128),
     Time(u128),
     HashTable(BTreeMap<WeechatType, WeechatType>),
     Hdata(Hdata),
-    Info(Option<String>, Option<String>),
-    InfoList(Option<String>, Vec<(String, WeechatType)>),
+    Info(WeechatString, WeechatString),
+    InfoList(WeechatString, Vec<(String, WeechatType)>),
     Array(Vec<WeechatType>),
 }
 
@@ -83,7 +107,7 @@ basic_unwrappable!(i8, Char);
 basic_unwrappable!(i32, Int);
 basic_unwrappable!(i128, Long);
 basic_unwrappable!(u128, Pointer, Time);
-basic_unwrappable!(Option<String>, String);
+basic_unwrappable!(WeechatString, String);
 basic_unwrappable!(Option<Vec<u8>>, Buffer);
 basic_unwrappable!(Vec<WeechatType>, Array);
 
@@ -307,8 +331,8 @@ fn parse_inl(read: &mut Read) -> Result<WeechatType, WeechatError> {
     let mut items = Vec::new();
     for _ in 0..count {
         let iname = match parse_str_std(read)? {
-            Some(i) => i,
-            None => {
+            WeechatString::Str(i) => i,
+            WeechatString::Null => {
                 return Err(WeechatError {
                     error: WeechatErrorType::HdataNullType,
                     message: "".to_owned(),
@@ -386,8 +410,8 @@ impl Message {
         let mut cursor = Cursor::new(decompressed);
 
         let id: String = match parse_str_std(&mut cursor)? {
-            Some(i) => i,
-            None => "".to_owned(),
+            WeechatString::Str(i) => i,
+            WeechatString::Null => "".to_owned(),
         };
         let mut data = Vec::new();
         while let Ok(parse) = parse_type_string(&mut cursor) {
@@ -408,12 +432,12 @@ fn handle_io_error() -> WeechatError {
     }
 }
 
-fn parse_str_std(read: &mut Read) -> Result<Option<String>, WeechatError> {
+fn parse_str_std(read: &mut Read) -> Result<WeechatString, WeechatError> {
     let mut _read_res: Result<(), Error> = Ok(());
     let len = parse_u32(read)?;
     if len == 0xFF_FF_FF_FF {
         // Null string
-        return Ok(None);
+        return Ok(WeechatString::Null);
     }
     let mut res = String::new();
     let str_read_res = read.take(u64::from(len)).read_to_string(&mut res);
@@ -424,7 +448,7 @@ fn parse_str_std(read: &mut Read) -> Result<Option<String>, WeechatError> {
         }
         return Err(handle_io_error());
     }
-    Ok(Some(res))
+    Ok(WeechatString::Str(res))
 }
 
 fn parse_u32(read: &mut Read) -> Result<u32, WeechatError> {
@@ -437,8 +461,8 @@ fn parse_u32(read: &mut Read) -> Result<u32, WeechatError> {
 
 fn parse_hda_path(read: &mut Read) -> Result<Vec<String>, WeechatError> {
     let base = match parse_str_std(read)? {
-        Some(e) => e,
-        None => {
+        WeechatString::Str(e) => e,
+        WeechatString::Null => {
             return Err(WeechatError::new(
                 WeechatErrorType::HdataNullId,
                 "".into(),
@@ -451,8 +475,8 @@ fn parse_hda_path(read: &mut Read) -> Result<Vec<String>, WeechatError> {
 
 fn parse_hda_keys(read: &mut Read) -> Result<Vec<(String, String)>, WeechatError> {
     let keys = match parse_str_std(read)? {
-        Some(e) => e,
-        None => {
+        WeechatString::Str(e) => e,
+        WeechatString::Null => {
             return Err(WeechatError::new(
                 WeechatErrorType::HdataNullId,
                 "".into(),

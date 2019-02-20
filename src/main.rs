@@ -84,8 +84,8 @@ fn main() {
                             Ok(bla) => {
                                 println!(
                                     "<{}>: {}",
-                                    bla.prefix.unwrap_or_default(),
-                                    bla.message.unwrap_or_default()
+                                    bla.prefix.to_str(),
+                                    bla.message.to_str()
                                 );
                             }
                             Err(e) => {
