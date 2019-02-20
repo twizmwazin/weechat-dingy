@@ -82,11 +82,7 @@ fn main() {
                     if let message::WeechatType::Hdata(data) = &msg.data[0] {
                         match sync::BufferLineAdded::parse(&data, 0) {
                             Ok(bla) => {
-                                println!(
-                                    "<{}>: {}",
-                                    bla.prefix.to_str(),
-                                    bla.message.to_str()
-                                );
+                                println!("<{}>: {}", bla.prefix.to_str(), bla.message.to_str());
                             }
                             Err(e) => {
                                 println!("{:?}", e);

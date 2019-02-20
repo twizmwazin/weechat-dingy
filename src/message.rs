@@ -47,18 +47,19 @@ pub enum WeechatString {
 
 impl WeechatString {
     pub fn map<T, F>(self, func: F) -> Option<T>
-    where F: FnOnce(String) -> T
+    where
+        F: FnOnce(String) -> T,
     {
         match self {
             WeechatString::Null => None,
-            WeechatString::Str(s) => Some(func(s))
+            WeechatString::Str(s) => Some(func(s)),
         }
     }
 
     pub fn to_str(self) -> String {
         match self {
             WeechatString::Null => "(null)".to_owned(),
-            WeechatString::Str(s) => s
+            WeechatString::Str(s) => s,
         }
     }
 }

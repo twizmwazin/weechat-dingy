@@ -1,5 +1,5 @@
-use crate::message;
 use backtrace::Backtrace;
+use crate::message;
 use message;
 use message::WeechatString;
 
