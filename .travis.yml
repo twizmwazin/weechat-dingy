@@ -10,3 +10,8 @@ script:
   - cargo fmt --all -- --check
   - cargo build
   - cargo test
+
+notifications:
+  irc:
+    channels:
+     - "ircs://irc.rpis.ec:6697#test"
