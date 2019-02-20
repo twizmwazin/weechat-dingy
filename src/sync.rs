@@ -1,6 +1,5 @@
-use backtrace::Backtrace;
 use crate::message;
-use message;
+use backtrace::Backtrace;
 use message::WeechatString;
 
 #[derive(Debug)]
