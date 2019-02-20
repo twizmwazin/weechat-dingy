@@ -14,4 +14,4 @@ script:
 notifications:
   irc:
     channels:
-     - "ircs://irc.rpis.ec:6697#test"
+     - "ircs://irc.rpis.ec:6697/#test"
