@@ -15,3 +15,4 @@ notifications:
   irc:
     channels:
      - "ircs://irc.rpis.ec:6697/#test"
+    skip_join: true
