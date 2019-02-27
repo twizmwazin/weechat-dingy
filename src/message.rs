@@ -131,6 +131,42 @@ where
     }
 }
 
+impl<K, V> WeechatUnwrappable<BTreeMap<K, V>> for BTreeMap<K, V>
+where
+    K: WeechatUnwrappable<K>,
+    K: Ord,
+    V: WeechatUnwrappable<V>,
+{
+    fn unwrap(wt: &WeechatType) -> Option<BTreeMap<K, V>> {
+        match wt {
+            WeechatType::HashTable(map) => {
+                let mut new_map: BTreeMap<K, V> = BTreeMap::new();
+
+                for (wt_key, wt_value) in map {
+                    let opt_key: Option<K> = wt_key.unwrap::<K>();
+                    let opt_value: Option<V> = wt_value.unwrap::<V>();
+                    match opt_key {
+                        Some(key) => match opt_value {
+                            Some(value) => {
+                                new_map.insert(key, value);
+                            }
+                            None => {
+                                return None;
+                            }
+                        },
+                        None => {
+                            return None;
+                        }
+                    };
+                }
+
+                Some(new_map)
+            }
+            _ => None,
+        }
+    }
+}
+
 impl WeechatUnwrappable<bool> for bool {
     fn unwrap(wt: &WeechatType) -> Option<bool> {
         wt.unwrap::<i8>().map(|x| x == 1)
