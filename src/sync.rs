@@ -17,7 +17,7 @@ pub struct SyncError {
 }
 
 macro_rules! sync_struct {
-    ($name: ident, {$($field : ident: $type : ty),*}) => {
+    ($name: ident {$($field : ident: $type : ty),*}) => {
 
         #[derive(Debug)]
         pub struct $name {
@@ -51,9 +51,8 @@ macro_rules! sync_struct {
     };
 }
 
-sync_struct!(
-    BufferOpened,
-    {number: i32,
+sync_struct!(BufferOpened {
+    number: i32,
     full_name: WeechatString,
     short_name: WeechatString,
     nicklist: i32,
@@ -61,21 +60,17 @@ sync_struct!(
     local_variables: BTreeMap<WeechatString, WeechatString>,
     prev_buffer: u128,
     next_buffer: u128
-    }
-);
+});
 
-sync_struct!(
-    BufferMoved,
-    {number: i32,
+sync_struct!(BufferMoved {
+    number: i32,
     full_name: WeechatString,
     prev_buffer: u128,
     next_buffer: u128
-    }
-);
+});
 
-sync_struct!(
-    BufferLineAdded,
-    {buffer: u128,
+sync_struct!(BufferLineAdded {
+    buffer: u128,
     date: u128,
     date_printed: u128,
     displayed: bool,
@@ -83,17 +78,14 @@ sync_struct!(
     prefix: WeechatString,
     message: WeechatString,
     tags_array: Vec<WeechatString>
-    }
-);
+});
 
-sync_struct!(
-    Nicklist,
-    {group: bool,
+sync_struct!(Nicklist {
+    group: bool,
     visible: bool,
     level: i32,
     name: WeechatString,
     color: WeechatString,
     prefix: WeechatString,
     prefix_color: WeechatString
-    }
-);
+});
