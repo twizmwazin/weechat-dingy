@@ -41,7 +41,7 @@ pub enum SyncMessage {
     UpgradeEnded,
 }
 
-pub trait SyncItem<T> {
+pub trait SyncHdataItem<T> {
     fn parse(message: &message::WeechatType) -> Result<Vec<T>, SyncError>;
 
     // Turn a WeechatType into a vector of messages whose underlying type is T
@@ -49,14 +49,12 @@ pub trait SyncItem<T> {
     // because we can't pass enum variants as parameters.
     fn parse_into<F>(item: &message::WeechatType, func: F) -> Result<Vec<SyncMessage>, SyncError>
     where
-        T: SyncItem<T>,
+        T: SyncHdataItem<T>,
         F: FnMut(&T) -> SyncMessage,
     {
         T::parse(item).map(|vec| vec.iter().map(func).collect::<Vec<_>>())
     }
-}
 
-pub trait SyncHdataItem<T> {
     fn parse_one(data: &message::Hdata, index: usize) -> Result<T, SyncError>;
 }
 
@@ -155,7 +153,7 @@ macro_rules! sync_struct {
             )*
         }
 
-        impl SyncItem<$name> for $name {
+        impl SyncHdataItem<$name> for $name {
             fn parse(message: &message::WeechatType) -> Result<Vec<$name>, SyncError> {
                 match message {
                     message::WeechatType::Hdata(data) => (0..data.len())
@@ -163,13 +161,12 @@ macro_rules! sync_struct {
                         .collect::<Result<Vec<$name>, SyncError>>(),
                     _ => Err(SyncError {
                         error: SyncErrorType::InvalidData,
-                        message: "Found non-hdata while unwrapping hdata-type".to_owned(),
+                        message: stringify!("Found non-hdata while unwrapping ", $name).to_owned(),
                         trace: Backtrace::new(),
                     }),
                 }
             }
-        }
-        impl SyncHdataItem<$name> for $name {
+
             fn parse_one(data: &message::Hdata, index: usize) -> Result<$name, SyncError> {
                 // Get all fields out of the hdata with their correct types and make sure they worked
                 $(
