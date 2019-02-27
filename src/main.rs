@@ -77,37 +77,40 @@ fn main() {
 
     loop {
         match message::Message::parse(&mut stream) {
-            Ok(msg) => match msg.id.as_str() {
-                "_buffer_line_added" => {
-                    if let message::WeechatType::Hdata(data) = &msg.data[0] {
-                        match sync::BufferLineAdded::parse(&data, 0) {
-                            Ok(bla) => {
-                                println!("<{}>: {}", bla.prefix.to_str(), bla.message.to_str());
-                            }
-                            Err(e) => {
-                                println!("{:?}", e);
+            Ok(msg) => {
+                if msg.id.len() > 0 && msg.id[0..1] == "_".to_owned() {
+                    let syncs = sync::SyncMessage::parse(&msg);
+
+                    match syncs {
+                        Ok(items) => {
+                            for vec in items {
+                                for m in vec {
+                                    match m {
+                                        sync::SyncMessage::BufferLineAdded(bla) => {
+                                            println!(
+                                                "<{}>: {}",
+                                                bla.prefix.to_str(),
+                                                bla.message.to_str()
+                                            );
+                                        }
+                                        sync::SyncMessage::Nicklist(nl) => {
+                                            println!("{:?}", nl);
+                                        }
+                                        _ => {
+                                            println!("{:?}", m);
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-                "_nicklist" | "nicks" => {
-                    if let message::WeechatType::Hdata(data) = &msg.data[0] {
-                        for i in 0..data.len() {
-                            match sync::Nicklist::parse(&data, i) {
-                                Ok(nl) => {
-                                    println!("{:?}", nl);
-                                }
-                                Err(e) => {
-                                    println!("{:?}", e);
-                                }
-                            }
+                        Err(e) => {
+                            println!("{:?}", e);
                         }
                     }
-                }
-                _ => {
+                } else {
                     println!("{:?}", msg);
                 }
-            },
+            }
             Err(e) => {
                 println!("parse error");
                 println!("{:?}", e);
