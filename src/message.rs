@@ -56,10 +56,10 @@ impl WeechatString {
         }
     }
 
-    pub fn to_str(self) -> String {
-        match self {
+    pub fn to_str(&self) -> String {
+        match &self {
             WeechatString::Null => "(null)".to_owned(),
-            WeechatString::Str(s) => s,
+            WeechatString::Str(s) => s.clone(),
         }
     }
 }

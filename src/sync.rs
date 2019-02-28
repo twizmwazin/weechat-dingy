@@ -68,10 +68,10 @@ impl SyncMessage {
     }
 
     pub fn parse_message_item(
-        id: &String,
+        id: &str,
         item: &message::WeechatType,
     ) -> Result<Vec<SyncMessage>, SyncError> {
-        match id.as_str() {
+        match id {
             "_buffer_opened" => {
                 BufferOpened::parse_into(item, |a| SyncMessage::BufferOpened(a.clone()))
             }
