@@ -78,7 +78,7 @@ fn main() {
     loop {
         match message::Message::parse(&mut stream) {
             Ok(msg) => {
-                if msg.id.is_empty() && &msg.id[0..1] == "_" {
+                if !msg.id.is_empty() && &msg.id[0..1] == "_" {
                     let syncs = sync::SyncMessage::parse(&msg);
 
                     match syncs {
