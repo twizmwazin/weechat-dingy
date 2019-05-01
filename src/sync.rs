@@ -2,9 +2,11 @@ use crate::message;
 use backtrace::Backtrace;
 use message::WeechatString;
 use std::collections::BTreeMap;
+use std::io::Error;
 
 #[derive(Debug)]
 pub enum SyncErrorType {
+    IoError,
     InvalidData,
     InvalidId,
     Other,
@@ -15,6 +17,34 @@ pub struct SyncError {
     pub error: SyncErrorType,
     pub message: String,
     pub trace: Backtrace,
+}
+
+impl std::fmt::Display for SyncError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for SyncError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+}
+
+impl From<Error> for SyncError {
+    fn from(ioError: Error) -> Self {
+        SyncError {
+            error: SyncErrorType::IoError,
+            message: format!("{}", ioError),
+            trace: Backtrace::new()
+        }
+    }
+}
+
+impl From<SyncError> for Error {
+    fn from(werr: SyncError) -> Self {
+        Error::new(std::io::ErrorKind::InvalidInput, werr)
+    }
 }
 
 #[derive(Debug)]

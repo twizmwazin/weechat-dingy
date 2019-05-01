@@ -1,11 +1,10 @@
 #![allow(dead_code)]
-use libflate::zlib::Decoder;
+use backtrace::Backtrace;
+use byteorder::{ByteOrder, BE};
+use libflate::zlib;
 use std::clone::Clone;
 use std::collections::BTreeMap;
 use std::io::{Cursor, Error, Read};
-
-use backtrace::Backtrace;
-use byteorder::{ByteOrder, BE};
 
 //
 // Types
@@ -199,6 +198,34 @@ pub struct WeechatError {
     pub error: WeechatErrorType,
     pub message: String,
     pub trace: Backtrace,
+}
+
+impl std::fmt::Display for WeechatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for WeechatError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+}
+
+impl From<Error> for WeechatError {
+    fn from(ioError: Error) -> Self {
+        WeechatError {
+            error: WeechatErrorType::IoError,
+            message: format!("{}", ioError),
+            trace: Backtrace::new()
+        }
+    }
+}
+
+impl From<WeechatError> for Error {
+    fn from(werr: WeechatError) -> Self {
+        Error::new(std::io::ErrorKind::InvalidInput, werr)
+    }
 }
 
 // Reads three-char type signatures into a String
@@ -405,16 +432,16 @@ struct MessageHeader {
 }
 
 impl MessageHeader {
-    fn parse(read: &mut Read) -> Self {
+    fn parse(read: &mut Read) -> Result<Option<Self>, WeechatError> {
         let len_buf = &mut [0u8; 4];
         // TODO: error checking?
-        read.read_exact(len_buf).unwrap();
+        read.read_exact(len_buf)?;
         let compression = &mut [0u8; 1];
-        read.read_exact(compression).unwrap();
-        MessageHeader {
+        read.read_exact(compression)?;
+        Ok(Some(MessageHeader {
             length: BE::read_u32(len_buf),
             compression: compression[0],
-        }
+        }))
     }
 }
 
@@ -426,35 +453,41 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn parse(read: &mut Read) -> Result<Message, WeechatError> {
-        let header = MessageHeader::parse(read);
-        let mut buffer = Vec::new();
-        // TODO: error check this
-        read.take(u64::from(header.length) - 5)
-            .read_to_end(&mut buffer)
-            .unwrap();
-        let decompressed = match header.compression {
-            0 => buffer,
-            1 => {
-                let mut dec = Decoder::new(buffer.as_slice()).unwrap();
-                let mut dec_buf = Vec::new();
-                dec.read_to_end(&mut dec_buf).unwrap();
-                dec_buf
-            }
-            // TODO: error here
-            _ => buffer,
-        };
-        let mut cursor = Cursor::new(decompressed);
+    pub fn parse(read: &mut Read) -> Result<Option<Message>, WeechatError> {
+        MessageHeader::parse(read).and_then(|opt_header| {
+            match opt_header {
+                Some(header) => {
+                    let mut buffer = Vec::new();
+                    // TODO: error check this
+                    read.take(u64::from(header.length) - 5)
+                        .read_to_end(&mut buffer)
+                        .unwrap();
+                    let decompressed = match header.compression {
+                        0 => buffer,
+                        1 => {
+                            let mut dec = zlib::Decoder::new(buffer.as_slice()).unwrap();
+                            let mut dec_buf = Vec::new();
+                            dec.read_to_end(&mut dec_buf).unwrap();
+                            dec_buf
+                        }
+                        // TODO: error here
+                        _ => buffer,
+                    };
+                    let mut cursor = Cursor::new(decompressed);
 
-        let id: String = match parse_str_std(&mut cursor)? {
-            WeechatString::Str(i) => i,
-            WeechatString::Null => "".to_owned(),
-        };
-        let mut data = Vec::new();
-        while let Ok(parse) = parse_type_string(&mut cursor) {
-            data.push(parse_weechat_type(parse, &mut cursor)?);
-        }
-        Ok(Message { header, id, data })
+                    let id: String = match parse_str_std(&mut cursor)? {
+                        WeechatString::Str(i) => i,
+                        WeechatString::Null => "".to_owned(),
+                    };
+                    let mut data = Vec::new();
+                    while let Ok(parse) = parse_type_string(&mut cursor) {
+                        data.push(parse_weechat_type(parse, &mut cursor)?);
+                    }
+                    Ok(Some(Message { header, id, data }))
+                },
+                None => Ok(None)
+            }
+        })
     }
 }
 
