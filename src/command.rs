@@ -48,10 +48,15 @@ pub trait CommandString {
     fn into_string(self) -> Option<String>;
 }
 
-impl<T> CommandString for T where T: Command {
+impl<T> CommandString for T
+where
+    T: Command,
+{
     fn into_string(self) -> Option<String> {
-        let mut value : Vec<u8> = vec!();
-        self.encode(&mut value).ok().and_then(|_| String::from_utf8(value).ok())
+        let mut value: Vec<u8> = vec![];
+        self.encode(&mut value)
+            .ok()
+            .and_then(|_| String::from_utf8(value).ok())
     }
 }
 

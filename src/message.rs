@@ -213,11 +213,11 @@ impl std::error::Error for WeechatError {
 }
 
 impl From<Error> for WeechatError {
-    fn from(ioError: Error) -> Self {
+    fn from(io_error: Error) -> Self {
         WeechatError {
             error: WeechatErrorType::IoError,
-            message: format!("{}", ioError),
-            trace: Backtrace::new()
+            message: format!("{}", io_error),
+            trace: Backtrace::new(),
         }
     }
 }
@@ -484,8 +484,8 @@ impl Message {
                         data.push(parse_weechat_type(parse, &mut cursor)?);
                     }
                     Ok(Some(Message { header, id, data }))
-                },
-                None => Ok(None)
+                }
+                None => Ok(None),
             }
         })
     }

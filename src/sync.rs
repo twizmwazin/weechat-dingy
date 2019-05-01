@@ -32,11 +32,11 @@ impl std::error::Error for SyncError {
 }
 
 impl From<Error> for SyncError {
-    fn from(ioError: Error) -> Self {
+    fn from(io_error: Error) -> Self {
         SyncError {
             error: SyncErrorType::IoError,
-            message: format!("{}", ioError),
-            trace: Backtrace::new()
+            message: format!("{}", io_error),
+            trace: Backtrace::new(),
         }
     }
 }
