@@ -121,10 +121,7 @@ where
             // Convert to an iter and then map unwrap (into Vec<Option<T>>)
             // Then collect into an Option<Vec<T>> which will be None if any of the Option<T>s are None
             // or Some(Vec<T>()) with the unwrapped contents, otherwise.
-            WeechatType::Array(array) => array
-                .iter()
-                .map(|item| T::unwrap(item))
-                .collect::<Option<Vec<T>>>(),
+            WeechatType::Array(array) => array.iter().map(|item| T::unwrap(item)).collect::<Option<Vec<T>>>(),
             _ => None,
         }
     }
@@ -214,11 +211,7 @@ impl std::error::Error for WeechatError {
 
 impl From<Error> for WeechatError {
     fn from(io_error: Error) -> Self {
-        WeechatError {
-            error: WeechatErrorType::IoError,
-            message: format!("{}", io_error),
-            trace: Backtrace::new(),
-        }
+        WeechatError { error: WeechatErrorType::IoError, message: format!("{}", io_error), trace: Backtrace::new() }
     }
 }
 
@@ -234,11 +227,7 @@ fn parse_type_string(read: &mut Read) -> Result<String, WeechatError> {
     let length = read.take(3).read_to_string(&mut res);
 
     if length.unwrap_or(0) != 3 {
-        return Err(WeechatError {
-            error: WeechatErrorType::IoError,
-            message: "last os error".to_owned(),
-            trace: Backtrace::new(),
-        });
+        return Err(WeechatError { error: WeechatErrorType::IoError, message: "last os error".to_owned(), trace: Backtrace::new() });
     }
 
     Ok(res)
@@ -262,11 +251,7 @@ fn parse_str_int(read: &mut Read, radix: u32) -> Result<i128, WeechatError> {
     // val is a binary string
     let ival = i128::from_str_radix(val.as_str(), radix);
     if ival.is_err() {
-        return Err(WeechatError {
-            error: WeechatErrorType::IoError,
-            message: "Int parse error".to_owned(),
-            trace: Backtrace::new(),
-        });
+        return Err(WeechatError { error: WeechatErrorType::IoError, message: "Int parse error".to_owned(), trace: Backtrace::new() });
     }
 
     Ok(ival.unwrap())
@@ -287,11 +272,7 @@ fn parse_weechat_type(_type: String, read: &mut Read) -> Result<WeechatType, Wee
         "inf" => parse_inf(read),
         "inl" => parse_inl(read),
         "arr" => parse_arr(read),
-        _ => Err(WeechatError {
-            error: WeechatErrorType::UnsupportedType,
-            message: _type,
-            trace: Backtrace::new(),
-        }),
+        _ => Err(WeechatError { error: WeechatErrorType::UnsupportedType, message: _type, trace: Backtrace::new() }),
     }
 }
 
@@ -324,9 +305,7 @@ fn parse_str(read: &mut Read) -> Result<WeechatType, WeechatError> {
 }
 
 fn parse_buf(read: &mut Read) -> Result<WeechatType, WeechatError> {
-    Ok(WeechatType::Buffer(
-        parse_str_std(read)?.map(|s| s.into_bytes()),
-    ))
+    Ok(WeechatType::Buffer(parse_str_std(read)?.map(|s| s.into_bytes())))
 }
 
 fn parse_ptr(read: &mut Read) -> Result<WeechatType, WeechatError> {
@@ -343,10 +322,7 @@ fn parse_htb(read: &mut Read) -> Result<WeechatType, WeechatError> {
     let count = parse_u32(read)?;
     let mut htb: BTreeMap<WeechatType, WeechatType> = BTreeMap::new();
     for _ in 0..count {
-        htb.insert(
-            parse_weechat_type(key_type.clone(), read)?,
-            parse_weechat_type(val_type.clone(), read)?,
-        );
+        htb.insert(parse_weechat_type(key_type.clone(), read)?, parse_weechat_type(val_type.clone(), read)?);
     }
     Ok(WeechatType::HashTable(htb))
 }
@@ -369,11 +345,7 @@ fn parse_hda(read: &mut Read) -> Result<WeechatType, WeechatError> {
         values.push(vals);
     }
 
-    let hda = Hdata {
-        h_path,
-        keys,
-        values,
-    };
+    let hda = Hdata { h_path, keys, values };
     Ok(WeechatType::Hdata(hda))
 }
 
@@ -397,11 +369,7 @@ fn parse_inl(read: &mut Read) -> Result<WeechatType, WeechatError> {
         let iname = match parse_str_std(read)? {
             WeechatString::Str(i) => i,
             WeechatString::Null => {
-                return Err(WeechatError {
-                    error: WeechatErrorType::HdataNullType,
-                    message: "".to_owned(),
-                    trace: Backtrace::new(),
-                });
+                return Err(WeechatError { error: WeechatErrorType::HdataNullType, message: "".to_owned(), trace: Backtrace::new() });
             }
         };
         let _type = parse_type_string(read)?;
@@ -438,10 +406,7 @@ impl MessageHeader {
         read.read_exact(len_buf)?;
         let compression = &mut [0u8; 1];
         read.read_exact(compression)?;
-        Ok(Some(MessageHeader {
-            length: BE::read_u32(len_buf),
-            compression: compression[0],
-        }))
+        Ok(Some(MessageHeader { length: BE::read_u32(len_buf), compression: compression[0] }))
     }
 }
 
@@ -459,9 +424,7 @@ impl Message {
                 Some(header) => {
                     let mut buffer = Vec::new();
                     // TODO: error check this
-                    read.take(u64::from(header.length) - 5)
-                        .read_to_end(&mut buffer)
-                        .unwrap();
+                    read.take(u64::from(header.length) - 5).read_to_end(&mut buffer).unwrap();
                     let decompressed = match header.compression {
                         0 => buffer,
                         1 => {
@@ -495,11 +458,7 @@ impl Message {
 // Helper functions
 //
 fn handle_io_error() -> WeechatError {
-    WeechatError {
-        error: WeechatErrorType::IoError,
-        message: "".to_owned(),
-        trace: Backtrace::new(),
-    }
+    WeechatError { error: WeechatErrorType::IoError, message: "".to_owned(), trace: Backtrace::new() }
 }
 
 fn parse_str_std(read: &mut Read) -> Result<WeechatString, WeechatError> {
@@ -533,11 +492,7 @@ fn parse_hda_path(read: &mut Read) -> Result<Vec<String>, WeechatError> {
     let base = match parse_str_std(read)? {
         WeechatString::Str(e) => e,
         WeechatString::Null => {
-            return Err(WeechatError::new(
-                WeechatErrorType::HdataNullId,
-                "".into(),
-                Backtrace::new(),
-            ));
+            return Err(WeechatError::new(WeechatErrorType::HdataNullId, "".into(), Backtrace::new()));
         }
     };
     Ok(base.split('/').map(|s| s.to_string()).collect())
@@ -547,11 +502,7 @@ fn parse_hda_keys(read: &mut Read) -> Result<Vec<(String, String)>, WeechatError
     let keys = match parse_str_std(read)? {
         WeechatString::Str(e) => e,
         WeechatString::Null => {
-            return Err(WeechatError::new(
-                WeechatErrorType::HdataNullId,
-                "".into(),
-                Backtrace::new(),
-            ));
+            return Err(WeechatError::new(WeechatErrorType::HdataNullId, "".into(), Backtrace::new()));
         }
     };
     let split_keys: Vec<&str> = keys.split(',').collect();

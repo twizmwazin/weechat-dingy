@@ -1,0 +1,7 @@
+use_small_heuristics = "max"
+max_width = 140
+
+# For one day when these are stable
+# fn_args_density = "compressed"
+# imports_layout = "horizontal"
+# overflow_delimited_expr = true

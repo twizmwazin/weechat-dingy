@@ -54,9 +54,7 @@ where
 {
     fn into_string(self) -> Option<String> {
         let mut value: Vec<u8> = vec![];
-        self.encode(&mut value)
-            .ok()
-            .and_then(|_| String::from_utf8(value).ok())
+        self.encode(&mut value).ok().and_then(|_| String::from_utf8(value).ok())
     }
 }
 
@@ -95,11 +93,7 @@ impl InitCommand {
         if self.password.is_some() || self.compression.is_some() {
             res.push_str(" ");
             if self.password.is_some() {
-                res = format!(
-                    "{}password={}",
-                    res,
-                    escape_password(&self.password.clone().unwrap())
-                );
+                res = format!("{}password={}", res, escape_password(&self.password.clone().unwrap()));
             }
             if self.compression.is_some() {
                 if self.password.is_some() {
@@ -252,12 +246,7 @@ pub struct InputCommand {
 
 impl InputCommand {
     pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        let res = format!(
-            "{}input {} {}\n",
-            handle_id(&self.id),
-            self.buffer,
-            self.data
-        );
+        let res = format!("{}input {} {}\n", handle_id(&self.id), self.buffer, self.data);
         out.write(res.as_bytes())
     }
 }

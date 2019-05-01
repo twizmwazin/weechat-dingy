@@ -22,24 +22,21 @@ fn main() {
     let env_server_addr = env::var("server");
     let env_password = env::var("password");
 
-    if env_server_addr.is_err() {
-        println!("Need to define env server=<addr:port>");
-        return;
-    }
-    if env_password.is_err() {
+    let server_addr =
+        if let Some(server_addr) = env_server_addr.ok().and_then(|addr| addr.to_socket_addrs().ok()).and_then(|mut addrs| addrs.next()) {
+            server_addr
+        } else {
+            println!("Need to define env server=<addr:port>");
+            return;
+        };
+    let password = if let Ok(password) = env_password {
+        password
+    } else {
         println!("Need to define env password=relay_passwd");
         return;
-    }
+    };
 
-    println!("Addr: {:?}", env_server_addr.clone().unwrap());
-
-    let server_addr = env_server_addr
-        .expect("1")
-        .to_socket_addrs()
-        .expect("2")
-        .next()
-        .expect("3");
-    let password = env_password.unwrap();
+    println!("Addr: {:?}", server_addr);
 
     //Goal API:
     // init_command.write(stream).and_then(|(stream, message)| {
@@ -53,14 +50,9 @@ fn main() {
 
     let tcp = TcpStream::connect(&server_addr)
         .and_then(move |stream| {
-            println!("Ah");
             let (sink, stream) = Framed::new(stream, WeechatCodec::new()).split();
 
-            let init_command = command::InitCommand::new(
-                None,
-                Some(password.to_owned()),
-                Some(command::CompressionType::None),
-            );
+            let init_command = command::InitCommand::new(None, Some(password.to_owned()), Some(command::CompressionType::None));
             init_command.encode(&mut std::io::stdout()).unwrap();
             let task = tx
                 .clone()
@@ -72,8 +64,7 @@ fn main() {
                     tx.send(Box::new(test_command))
                 })
                 .and_then(|tx| {
-                    let ping_command =
-                        command::PingCommand::new(None, Some(vec!["abcdefg".into()]));
+                    let ping_command = command::PingCommand::new(None, Some(vec!["abcdefg".into()]));
                     ping_command.encode(&mut std::io::stdout()).unwrap();
                     tx.send(Box::new(ping_command))
                 })
@@ -86,10 +77,7 @@ fn main() {
                     let hdata_command = command::HdataCommand::new(
                         Some("HDATA HERE".to_owned()),
                         "buffer".into(),
-                        (
-                            "gui_buffers".into(),
-                            Some(command::HdataCommandLength::Infinite),
-                        ),
+                        ("gui_buffers".into(), Some(command::HdataCommandLength::Infinite)),
                         vec![],
                         Some(vec!["number".into(), "name".into()]),
                     );
@@ -97,8 +85,7 @@ fn main() {
                     tx.send(Box::new(hdata_command))
                 })
                 .and_then(|tx| {
-                    let nick_command =
-                        command::NicklistCommand::new(Some("nicks".to_owned()), None);
+                    let nick_command = command::NicklistCommand::new(Some("nicks".to_owned()), None);
                     nick_command.encode(&mut std::io::stdout()).unwrap();
                     tx.send(Box::new(nick_command))
                 })
