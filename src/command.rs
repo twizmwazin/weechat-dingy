@@ -44,6 +44,17 @@ pub trait Command {
     fn encode(&self, out: &mut Write) -> Result<usize, Error>;
 }
 
+pub trait CommandString {
+    fn into_string(&self) -> Option<String>;
+}
+
+impl<T> CommandString for T where T: Command {
+    fn into_string(&self) -> Option<String> {
+        let mut value : Vec<u8> = vec!();
+        self.encode(&mut value).ok().and_then(|_| String::from_utf8(value).ok())
+    }
+}
+
 #[derive(Copy)]
 pub enum CompressionType {
     None,
