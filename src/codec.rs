@@ -17,7 +17,10 @@ impl Decoder for WeechatCodec {
     type Item = Message;
     type Error = std::io::Error;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(
+        &mut self,
+        src: &mut BytesMut,
+    ) -> Result<Option<Self::Item>, Self::Error> {
         if src.len() < 5 {
             return Ok(None);
         }
@@ -33,7 +36,11 @@ impl Encoder for WeechatCodec {
     type Item = Box<Command + Send>;
     type Error = std::io::Error;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(
+        &mut self,
+        item: Self::Item,
+        dst: &mut BytesMut,
+    ) -> Result<(), Self::Error> {
         let mut value: Vec<u8> = vec![];
         let _size = item.encode(&mut value)?;
         Ok(dst.put(value))

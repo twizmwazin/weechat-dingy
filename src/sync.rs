@@ -33,7 +33,11 @@ impl std::error::Error for SyncError {
 
 impl From<Error> for SyncError {
     fn from(io_error: Error) -> Self {
-        SyncError { error: SyncErrorType::IoError, message: format!("{}", io_error), trace: Backtrace::new() }
+        SyncError {
+            error: SyncErrorType::IoError,
+            message: format!("{}", io_error),
+            trace: Backtrace::new(),
+        }
     }
 }
 
@@ -73,7 +77,10 @@ pub trait SyncHdataItem<T> {
     // Turn a WeechatType into a vector of messages whose underlying type is T
     // F func is to go from T to SyncMessage (so |a| SyncMessage::Variant(a.clone()) generally)
     // because we can't pass enum variants as parameters.
-    fn parse_into<F>(item: &message::WeechatType, func: F) -> Result<Vec<SyncMessage>, SyncError>
+    fn parse_into<F>(
+        item: &message::WeechatType,
+        func: F,
+    ) -> Result<Vec<SyncMessage>, SyncError>
     where
         T: SyncHdataItem<T>,
         F: FnMut(&T) -> SyncMessage,
@@ -85,7 +92,9 @@ pub trait SyncHdataItem<T> {
 }
 
 impl SyncMessage {
-    pub fn parse(message: &message::Message) -> Result<Vec<Vec<SyncMessage>>, SyncError> {
+    pub fn parse(
+        message: &message::Message,
+    ) -> Result<Vec<Vec<SyncMessage>>, SyncError> {
         message
             .data
             .iter()
@@ -93,30 +102,72 @@ impl SyncMessage {
             .collect::<Result<Vec<Vec<SyncMessage>>, SyncError>>()
     }
 
-    pub fn parse_message_item(id: &str, item: &message::WeechatType) -> Result<Vec<SyncMessage>, SyncError> {
+    pub fn parse_message_item(
+        id: &str,
+        item: &message::WeechatType,
+    ) -> Result<Vec<SyncMessage>, SyncError> {
         match id {
-            "_buffer_opened" => BufferOpened::parse_into(item, |a| SyncMessage::BufferOpened(a.clone())),
-            "_buffer_moved" => BufferMoved::parse_into(item, |a| SyncMessage::BufferMoved(a.clone())),
-            "_buffer_merged" => BufferMerged::parse_into(item, |a| SyncMessage::BufferMerged(a.clone())),
-            "_buffer_unmerged" => BufferUnmerged::parse_into(item, |a| SyncMessage::BufferUnmerged(a.clone())),
-            "_buffer_hidden" => BufferHidden::parse_into(item, |a| SyncMessage::BufferHidden(a.clone())),
-            "_buffer_unhidden" => BufferUnhidden::parse_into(item, |a| SyncMessage::BufferUnhidden(a.clone())),
-            "_buffer_renamed" => BufferRenamed::parse_into(item, |a| SyncMessage::BufferRenamed(a.clone())),
-            "_buffer_title_changed" => BufferTitleChanged::parse_into(item, |a| SyncMessage::BufferTitleChanged(a.clone())),
-            "_buffer_cleared" => BufferCleared::parse_into(item, |a| SyncMessage::BufferCleared(a.clone())),
-            "_buffer_type_changed" => BufferTypeChanged::parse_into(item, |a| SyncMessage::BufferTypeChanged(a.clone())),
-            "_buffer_localvar_added" => BufferLocalvarAdded::parse_into(item, |a| SyncMessage::BufferLocalvarAdded(a.clone())),
-            "_buffer_localvar_changed" => BufferLocalvarChanged::parse_into(item, |a| SyncMessage::BufferLocalvarChanged(a.clone())),
-            "_buffer_localvar_removed" => BufferLocalvarRemoved::parse_into(item, |a| SyncMessage::BufferLocalvarRemoved(a.clone())),
-            "_buffer_line_added" => BufferLineAdded::parse_into(item, |a| SyncMessage::BufferLineAdded(a.clone())),
-            "_buffer_closing" => BufferClosing::parse_into(item, |a| SyncMessage::BufferClosing(a.clone())),
-            "_nicklist" => Nicklist::parse_into(item, |a| SyncMessage::Nicklist(a.clone())),
-            "_nicklist_diff" => NicklistDiff::parse_into(item, |a| SyncMessage::NicklistDiff(a.clone())),
+            "_buffer_opened" => BufferOpened::parse_into(item, |a| {
+                SyncMessage::BufferOpened(a.clone())
+            }),
+            "_buffer_moved" => BufferMoved::parse_into(item, |a| {
+                SyncMessage::BufferMoved(a.clone())
+            }),
+            "_buffer_merged" => BufferMerged::parse_into(item, |a| {
+                SyncMessage::BufferMerged(a.clone())
+            }),
+            "_buffer_unmerged" => BufferUnmerged::parse_into(item, |a| {
+                SyncMessage::BufferUnmerged(a.clone())
+            }),
+            "_buffer_hidden" => BufferHidden::parse_into(item, |a| {
+                SyncMessage::BufferHidden(a.clone())
+            }),
+            "_buffer_unhidden" => BufferUnhidden::parse_into(item, |a| {
+                SyncMessage::BufferUnhidden(a.clone())
+            }),
+            "_buffer_renamed" => BufferRenamed::parse_into(item, |a| {
+                SyncMessage::BufferRenamed(a.clone())
+            }),
+            "_buffer_title_changed" => BufferTitleChanged::parse_into(item, |a| {
+                SyncMessage::BufferTitleChanged(a.clone())
+            }),
+            "_buffer_cleared" => BufferCleared::parse_into(item, |a| {
+                SyncMessage::BufferCleared(a.clone())
+            }),
+            "_buffer_type_changed" => BufferTypeChanged::parse_into(item, |a| {
+                SyncMessage::BufferTypeChanged(a.clone())
+            }),
+            "_buffer_localvar_added" => BufferLocalvarAdded::parse_into(item, |a| {
+                SyncMessage::BufferLocalvarAdded(a.clone())
+            }),
+            "_buffer_localvar_changed" => {
+                BufferLocalvarChanged::parse_into(item, |a| {
+                    SyncMessage::BufferLocalvarChanged(a.clone())
+                })
+            }
+            "_buffer_localvar_removed" => {
+                BufferLocalvarRemoved::parse_into(item, |a| {
+                    SyncMessage::BufferLocalvarRemoved(a.clone())
+                })
+            }
+            "_buffer_line_added" => BufferLineAdded::parse_into(item, |a| {
+                SyncMessage::BufferLineAdded(a.clone())
+            }),
+            "_buffer_closing" => BufferClosing::parse_into(item, |a| {
+                SyncMessage::BufferClosing(a.clone())
+            }),
+            "_nicklist" => {
+                Nicklist::parse_into(item, |a| SyncMessage::Nicklist(a.clone()))
+            }
+            "_nicklist_diff" => NicklistDiff::parse_into(item, |a| {
+                SyncMessage::NicklistDiff(a.clone())
+            }),
             "_pong" => match item.unwrap::<WeechatString>() {
                 Some(ws) => Ok(vec![SyncMessage::Pong(ws)]),
                 _ => Err(SyncError {
                     error: SyncErrorType::InvalidId,
-                    message: format!("Unexpected type for _pong: {:?}", item).to_owned(),
+                    message: format!("Unexpected type for _pong: {:?}", item)
+                        .to_owned(),
                     trace: Backtrace::new(),
                 }),
             },

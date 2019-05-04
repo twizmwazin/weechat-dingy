@@ -41,7 +41,10 @@ impl Clone for CommandType {
 }
 
 pub trait Command {
+    fn get_id(&self) -> Option<String>;
+    fn set_id(&mut self, id: Option<String>);
     fn encode(&self, out: &mut Write) -> Result<usize, Error>;
+    fn has_response(&self) -> bool;
 }
 
 pub trait CommandString {
@@ -87,19 +90,27 @@ pub struct InitCommand {
 }
 
 impl InitCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("init");
         if self.password.is_some() || self.compression.is_some() {
             res.push_str(" ");
             if self.password.is_some() {
-                res = format!("{}password={}", res, escape_password(&self.password.clone().unwrap()));
+                res = format!(
+                    "{}password={}",
+                    res,
+                    escape_password(&self.password.clone().unwrap())
+                );
             }
             if self.compression.is_some() {
                 if self.password.is_some() {
                     res.push_str(",")
                 }
-                res = format!("{}compression={}", res, self.compression.unwrap().as_str());
+                res = format!(
+                    "{}compression={}",
+                    res,
+                    self.compression.unwrap().as_str()
+                );
             }
         }
         res.push_str("\n");
@@ -108,8 +119,20 @@ impl InitCommand {
 }
 
 impl Command for InitCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        false
     }
 }
 
@@ -128,7 +151,7 @@ pub struct HdataCommand {
 }
 
 impl HdataCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res = format!("{}hdata {}:{}", res, self.hdata, self.pointer.0);
 
@@ -145,7 +168,9 @@ impl HdataCommand {
             if let Some(e) = &v.1 {
                 res = match e {
                     HdataCommandLength::Infinite => format!("{}(*)", res),
-                    HdataCommandLength::Finite(count) => format!("{}({})", res, count),
+                    HdataCommandLength::Finite(count) => {
+                        format!("{}({})", res, count)
+                    }
                 }
             }
         }
@@ -158,8 +183,20 @@ impl HdataCommand {
 }
 
 impl Command for HdataCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        true
     }
 }
 
@@ -170,15 +207,27 @@ pub struct InfoCommand {
 }
 
 impl InfoCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let res = format!("{}info {}\n", handle_id(&self.id), self.name);
         out.write(res.as_bytes())
     }
 }
 
 impl Command for InfoCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        true
     }
 }
 
@@ -191,7 +240,7 @@ pub struct InfoListCommand {
 }
 
 impl InfoListCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res = format!("{}infolist {}", res, &self.name);
         if self.pointer.is_some() {
@@ -208,8 +257,20 @@ impl InfoListCommand {
 }
 
 impl Command for InfoListCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        true
     }
 }
 
@@ -220,7 +281,7 @@ pub struct NicklistCommand {
 }
 
 impl NicklistCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("nicklist");
         if self.buffer.is_some() {
@@ -232,8 +293,20 @@ impl NicklistCommand {
 }
 
 impl Command for NicklistCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        true
     }
 }
 
@@ -245,15 +318,28 @@ pub struct InputCommand {
 }
 
 impl InputCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
-        let res = format!("{}input {} {}\n", handle_id(&self.id), self.buffer, self.data);
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+        let res =
+            format!("{}input {} {}\n", handle_id(&self.id), self.buffer, self.data);
         out.write(res.as_bytes())
     }
 }
 
 impl Command for InputCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        true
     }
 }
 
@@ -282,7 +368,7 @@ pub struct SyncCommand {
 }
 
 impl SyncCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res: String = handle_id(&self.id);
         res = format!("{}sync", res);
         if !self.args.is_empty() {
@@ -307,8 +393,20 @@ impl SyncCommand {
 }
 
 impl Command for SyncCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        false
     }
 }
 
@@ -319,7 +417,7 @@ pub struct DesyncCommand {
 }
 
 impl DesyncCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res: String = handle_id(&self.id);
         res = format!("{}desync", res);
         if !self.args.is_empty() {
@@ -344,8 +442,20 @@ impl DesyncCommand {
 }
 
 impl Command for DesyncCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        false
     }
 }
 
@@ -355,15 +465,27 @@ pub struct TestCommand {
 }
 
 impl TestCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let res = format!("{}test\n", handle_id(&self.id));
         out.write(res.as_bytes())
     }
 }
 
 impl Command for TestCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        true
     }
 }
 
@@ -374,7 +496,7 @@ pub struct PingCommand {
 }
 
 impl PingCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("ping");
         if self.arguments.is_some() {
@@ -388,8 +510,20 @@ impl PingCommand {
 }
 
 impl Command for PingCommand {
+    fn get_id(&self) -> Option<String> {
+        Some("_pong".into())
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        true
     }
 }
 
@@ -399,15 +533,27 @@ pub struct QuitCommand {
 }
 
 impl QuitCommand {
-    pub fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         let res = format!("{}quit\n", handle_id(&self.id));
         out.write(res.as_bytes())
     }
 }
 
 impl Command for QuitCommand {
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: Option<String>) {
+        self.id = id;
+    }
+
     fn encode(&self, out: &mut Write) -> Result<usize, Error> {
         self.encode(out)
+    }
+
+    fn has_response(&self) -> bool {
+        false
     }
 }
 
