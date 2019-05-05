@@ -20,31 +20,43 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 
 type BoxCommand = Box<Command + Send>;
-type PendingList = Arc<Mutex<HashMap<String, Message>>>;
-type PendingCommandList = Arc<Mutex<HashSet<String>>>;
-type PendingTaskList = Arc<Mutex<Vec<Task>>>;
 
+// Weechat server connection
 pub struct WeechatServer {
     command_tx: Sender<BoxCommand>,
-    pending: PendingList,
-    pending_commands: PendingCommandList,
-    pending_tasks: PendingTaskList,
+    pending: Arc<Mutex<PendingList>>,
 }
 
+// Future for sent commands, returned by .send()
+// Future param is a tuple (tx: ServerSender, msg: Message)
 pub struct SendCommand {
     id: String,
     tx: Sender<BoxCommand>,
     has_response: bool,
-    pending: PendingList,
-    pending_commands: PendingCommandList,
-    pending_tasks: PendingTaskList,
+    pending: Arc<Mutex<PendingList>>,
 }
 
+// Helper class for sending commands in futures (for chaining)
 pub struct ServerSender {
     tx: Sender<BoxCommand>,
-    pending: PendingList,
-    pending_commands: PendingCommandList,
-    pending_tasks: PendingTaskList,
+    pending: Arc<Mutex<PendingList>>,
+}
+
+// Private mutable state for pending data
+struct PendingList {
+    messages: HashMap<String, Message>,
+    commands: HashSet<String>,
+    tasks: Vec<Task>,
+}
+
+impl PendingList {
+    pub fn new() -> PendingList {
+        PendingList {
+            messages: HashMap::<String, Message>::new(),
+            commands: HashSet::<String>::new(),
+            tasks: Vec::<Task>::new(),
+        }
+    }
 }
 
 impl ServerSender {
@@ -59,27 +71,15 @@ impl ServerSender {
             command.get_id().unwrap()
         };
         let pending = self.pending.clone();
-        let pending_tasks = self.pending_tasks.clone();
-        let pending_commands = self.pending_commands.clone();
         let has_response = command.has_response();
 
         if has_response {
-            assert_eq!(
-                self.pending_commands.lock().unwrap().insert(id.clone()),
-                true
-            );
+            let mut mpending = self.pending.lock().unwrap();
+            assert_eq!(mpending.commands.insert(id.clone()), true);
         }
 
         self.tx.send(Box::new(command)).map_err(|_| ()).and_then(move |tx| {
-            SendCommand {
-                id,
-                tx,
-                has_response,
-                pending,
-                pending_commands,
-                pending_tasks,
-            }
-            .map_err(|_| ())
+            SendCommand { id, tx, has_response, pending }.map_err(|_| ())
         })
     }
 
@@ -104,28 +104,17 @@ impl Future for SendCommand {
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         if !self.has_response {
             return Ok(Async::Ready((
-                ServerSender {
-                    tx: self.tx.clone(),
-                    pending: self.pending.clone(),
-                    pending_commands: self.pending_commands.clone(),
-                    pending_tasks: self.pending_tasks.clone(),
-                },
+                ServerSender { tx: self.tx.clone(), pending: self.pending.clone() },
                 None,
             )));
         }
 
-        let mut pending_tasks = self.pending_tasks.lock().unwrap();
-        pending_tasks.push(task::current());
+        let mut mpending = self.pending.lock().unwrap();
+        mpending.tasks.push(task::current());
 
-        let mut pending = self.pending.lock().unwrap();
-        if let Some(msg) = pending.remove(&self.id) {
+        if let Some(msg) = mpending.messages.remove(&self.id) {
             Ok(Async::Ready((
-                ServerSender {
-                    tx: self.tx.clone(),
-                    pending: self.pending.clone(),
-                    pending_commands: self.pending_commands.clone(),
-                    pending_tasks: self.pending_tasks.clone(),
-                },
+                ServerSender { tx: self.tx.clone(), pending: self.pending.clone() },
                 Some(msg),
             )))
         } else {
@@ -139,9 +128,7 @@ impl WeechatServer {
         let (command_tx, command_rx) = mpsc::channel::<BoxCommand>(0);
         let (message_tx, message_rx) = mpsc::channel::<Message>(0);
 
-        let pending = Arc::new(Mutex::new(HashMap::<String, Message>::new()));
-        let pending_commands = Arc::new(Mutex::new(HashSet::<String>::new()));
-        let pending_tasks = Arc::new(Mutex::new(Vec::<Task>::new()));
+        let pending = Arc::new(Mutex::new(PendingList::new()));
 
         let future = WeechatServer::start(
             addr,
@@ -149,28 +136,21 @@ impl WeechatServer {
             message_rx,
             message_tx,
             pending.clone(),
-            pending_commands.clone(),
-            pending_tasks.clone(),
         );
 
         thread::spawn(move || {
             tokio::run(future);
         });
 
-        WeechatServer { command_tx, pending, pending_commands, pending_tasks }
+        WeechatServer { command_tx, pending }
     }
 
     pub fn send<C: Command + Send + 'static>(
         &self,
         command: C,
     ) -> impl Future<Item = (ServerSender, Option<Message>), Error = ()> {
-        ServerSender {
-            tx: self.command_tx.clone(),
-            pending: self.pending.clone(),
-            pending_commands: self.pending_commands.clone(),
-            pending_tasks: self.pending_tasks.clone(),
-        }
-        .send(command)
+        ServerSender { tx: self.command_tx.clone(), pending: self.pending.clone() }
+            .send(command)
     }
 
     fn start(
@@ -178,9 +158,7 @@ impl WeechatServer {
         command_rx: Receiver<BoxCommand>,
         message_rx: Receiver<Message>,
         message_tx: Sender<Message>,
-        pending: PendingList,
-        pending_commands: PendingCommandList,
-        pending_tasks: PendingTaskList,
+        pending: Arc<Mutex<PendingList>>,
     ) -> Box<Future<Item = (), Error = ()> + Send> {
         let tcp = TcpStream::connect(addr)
             .map_err(|e| println!("Connect failed: {:?}", e))
@@ -206,20 +184,10 @@ impl WeechatServer {
                     )
                     .join(
                         message_rx
-                            .fold(
-                                (pending, pending_commands, pending_tasks),
-                                |(pending, pending_commands, pending_tasks), msg| {
-                                    WeechatServer::handle_message(
-                                        msg,
-                                        pending.clone(),
-                                        pending_commands.clone(),
-                                        pending_tasks.clone(),
-                                    )
-                                    .map(|_| {
-                                        (pending, pending_commands, pending_tasks)
-                                    })
-                                },
-                            )
+                            .fold(pending, |pending, msg| {
+                                WeechatServer::handle_message(msg, pending.clone())
+                                    .map(|_| pending)
+                            })
                             .map_err(|e| println!("Receive error: {:?}", e)),
                     )
                     .map_err(|e| println!("Join error: {:?}", e))
@@ -231,21 +199,15 @@ impl WeechatServer {
 
     fn handle_message(
         msg: Message,
-        pending: PendingList,
-        pending_commands: PendingCommandList,
-        pending_tasks: PendingTaskList,
+        pending: Arc<Mutex<PendingList>>,
     ) -> Result<(), ()> {
-        let mut mpending_commands = pending_commands.lock().unwrap();
-        mpending_commands.remove(&msg.id);
-
         let mut mpending = pending.lock().unwrap();
-        mpending.insert(msg.id.clone(), msg);
-
-        let mut mpending_tasks = pending_tasks.lock().unwrap();
-        for task in mpending_tasks.iter() {
+        mpending.commands.remove(&msg.id);
+        mpending.messages.insert(msg.id.clone(), msg);
+        for task in mpending.tasks.iter() {
             task.notify();
         }
-        mpending_tasks.clear();
+        mpending.tasks.clear();
 
         Ok(())
     }
