@@ -1,5 +1,6 @@
 use crate::command::Command;
 use crate::message::Message;
+use crate::message::MessageHeader;
 use bytes::BufMut;
 use bytes::BytesMut;
 use std::io::Cursor;
@@ -24,6 +25,17 @@ impl Decoder for WeechatCodec {
         if src.len() < 5 {
             return Ok(None);
         }
+        let mut header_cursor = Cursor::new(&src);
+        let opt_header = MessageHeader::parse(&mut header_cursor)?;
+
+        if let Some(header) = opt_header {
+            if src.len() < header.length as usize {
+                return Ok(None);
+            }
+        } else {
+            return Ok(None);
+        }
+
         let mut cursor = Cursor::new(&src);
         let parsed = Message::parse(&mut cursor);
         src.split_to(cursor.position() as _);

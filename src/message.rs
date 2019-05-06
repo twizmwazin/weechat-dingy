@@ -422,13 +422,13 @@ fn parse_arr(read: &mut Read) -> Result<WeechatType, WeechatError> {
 //
 
 #[derive(Debug)]
-struct MessageHeader {
-    length: u32,
-    compression: u8,
+pub struct MessageHeader {
+    pub length: u32,
+    pub compression: u8,
 }
 
 impl MessageHeader {
-    fn parse(read: &mut Read) -> Result<Option<Self>, WeechatError> {
+    pub fn parse(read: &mut Read) -> Result<Option<Self>, WeechatError> {
         let len_buf = &mut [0u8; 4];
         // TODO: error checking?
         read.read_exact(len_buf)?;
