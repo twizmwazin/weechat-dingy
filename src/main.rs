@@ -9,6 +9,7 @@ use crate::command::Command;
 use crate::server::WeechatServer;
 use std::env;
 use std::net::ToSocketAddrs;
+use std::thread;
 use tokio::prelude::*;
 
 mod codec;
@@ -39,36 +40,6 @@ fn main() {
     };
 
     println!("Addr: {:?}", server_addr);
-
-    //         stream.for_each(|msg| {
-    //             if !msg.id.is_empty() && &msg.id[0..1] == "_" {
-    //                 let items = sync::SyncMessage::parse(&msg)?;
-    //                 for vec in items {
-    //                     for m in vec {
-    //                         println!("{:?}", m);
-    //                         match m {
-    //                             sync::SyncMessage::BufferLineAdded(bla) => {
-    //                                 println!(
-    //                                     "<{}>: {}",
-    //                                     bla.prefix.to_str(),
-    //                                     bla.message.to_str()
-    //                                 );
-    //                             }
-    //                             sync::SyncMessage::Nicklist(nl) => {
-    //                                 println!("{:?}", nl);
-    //                             }
-    //                             _ => {
-    //                                 println!("{:?}", m);
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             } else {
-    //                 println!("{:?}", msg);
-    //             }
-    //             Ok(())
-    //         })
-
     let server = WeechatServer::new(&server_addr);
 
     let init_command = command::InitCommand::new(
@@ -78,58 +49,105 @@ fn main() {
     );
     init_command.encode(&mut std::io::stdout()).unwrap();
 
-    let task = server
+    let sync = server.sync();
+
+    let init_task = server
         .send(init_command)
         .and_then(|(tx, _)| {
-            // TODO: Move test somewhere else
-            let test_command = command::TestCommand::new(Some("aaa".into()));
-            test_command.encode(&mut std::io::stdout()).unwrap();
-            tx.send(test_command)
-        })
-        .and_then(|(tx, msg)| {
-            println!("Got message: {:?}", msg);
+            // Send stuff on separate thread.
+            thread::spawn(move || {
+                // TODO: Move test somewhere else
+                let test_command = command::TestCommand::new(Some("aaa".into()));
+                test_command.encode(&mut std::io::stdout()).unwrap();
+                let commands_task = tx
+                    .send(test_command)
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
 
-            let ping_command =
-                command::PingCommand::new(None, Some(vec!["abcdefg".into()]));
-            ping_command.encode(&mut std::io::stdout()).unwrap();
-            tx.send(ping_command)
-        })
-        .and_then(|(tx, msg)| {
-            println!("Got message: {:?}", msg);
+                        let ping_command = command::PingCommand::new(
+                            None,
+                            Some(vec!["abcdefg".into()]),
+                        );
+                        ping_command.encode(&mut std::io::stdout()).unwrap();
+                        tx.send(ping_command)
+                    })
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
 
-            let info_command = command::InfoCommand::new(None, "version".to_owned());
-            info_command.encode(&mut std::io::stdout()).unwrap();
-            tx.send(info_command)
-        })
-        .and_then(|(tx, msg)| {
-            println!("Got message: {:?}", msg);
+                        let info_command =
+                            command::InfoCommand::new(None, "version".to_owned());
+                        info_command.encode(&mut std::io::stdout()).unwrap();
+                        tx.send(info_command)
+                    })
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
 
-            let hdata_command = command::HdataCommand::new(
-                Some("HDATA HERE".to_owned()),
-                "buffer".into(),
-                ("gui_buffers".into(), Some(command::HdataCommandLength::Infinite)),
-                vec![],
-                Some(vec!["number".into(), "name".into()]),
-            );
-            hdata_command.encode(&mut std::io::stdout()).unwrap();
-            tx.send(hdata_command)
-        })
-        .and_then(|(tx, msg)| {
-            println!("Got message: {:?}", msg);
+                        let hdata_command = command::HdataCommand::new(
+                            Some("HDATA HERE".to_owned()),
+                            "buffer".into(),
+                            (
+                                "gui_buffers".into(),
+                                Some(command::HdataCommandLength::Infinite),
+                            ),
+                            vec![],
+                            Some(vec!["number".into(), "name".into()]),
+                        );
+                        hdata_command.encode(&mut std::io::stdout()).unwrap();
+                        tx.send(hdata_command)
+                    })
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
 
-            let nick_command =
-                command::NicklistCommand::new(Some("nicks".to_owned()), None);
-            nick_command.encode(&mut std::io::stdout()).unwrap();
-            tx.send(nick_command)
-        })
-        .and_then(|(tx, msg)| {
-            println!("Got message: {:?}", msg);
+                        let nick_command = command::NicklistCommand::new(
+                            Some("nicks".to_owned()),
+                            None,
+                        );
+                        nick_command.encode(&mut std::io::stdout()).unwrap();
+                        tx.send(nick_command)
+                    })
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
 
-            let sync_command = command::SyncCommand::new(None, vec![]);
-            sync_command.encode(&mut std::io::stdout()).unwrap();
-            tx.send(sync_command)
+                        let sync_command = command::SyncCommand::new(None, vec![]);
+                        sync_command.encode(&mut std::io::stdout()).unwrap();
+                        tx.send(sync_command)
+                    })
+                    .then(|_| Ok(()));
+
+                tokio::run(commands_task);
+            });
+
+            Ok(())
         })
+        .map_err(|_| ())
+        .join(
+            sync.for_each(|msg| {
+                let items = sync::SyncMessage::parse(&msg).unwrap();
+                for vec in items {
+                    for m in vec {
+                        match m {
+                            sync::SyncMessage::BufferLineAdded(bla) => {
+                                println!(
+                                    "<{}>: {}",
+                                    bla.prefix.to_str(),
+                                    bla.message.to_str()
+                                );
+                            }
+                            sync::SyncMessage::Nicklist(nl) => {
+                                println!("{:?}", nl);
+                            }
+                            _ => {
+                                println!("{:?}", m);
+                            }
+                        }
+                    }
+                }
+
+                Ok(())
+            })
+            .map_err(|_| ()),
+        )
         .then(|_| Ok(()));
 
-    tokio::run(task);
+    tokio::run(init_task);
 }

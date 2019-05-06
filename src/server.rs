@@ -1,6 +1,7 @@
 use crate::codec::WeechatCodec;
 use crate::command::Command;
 use crate::message::Message;
+use futures::future::*;
 use futures::sync::mpsc;
 use futures::sync::mpsc::*;
 use futures::task::Task;
@@ -28,7 +29,7 @@ pub struct WeechatServer {
 }
 
 // Future for sent commands, returned by .send()
-// Future param is a tuple (tx: ServerSender, msg: Message)
+// Future param is a tuple (tx: CommandSender, msg: Message)
 pub struct SendCommand {
     id: String,
     tx: Sender<BoxCommand>,
@@ -37,7 +38,7 @@ pub struct SendCommand {
 }
 
 // Helper class for sending commands in futures (for chaining)
-pub struct ServerSender {
+pub struct CommandSender {
     tx: Sender<BoxCommand>,
     pending: Arc<Mutex<PendingList>>,
 }
@@ -47,6 +48,7 @@ struct PendingList {
     messages: HashMap<String, Message>,
     commands: HashSet<String>,
     tasks: Vec<Task>,
+    receivers: Vec<Sender<Arc<Message>>>,
 }
 
 impl PendingList {
@@ -55,15 +57,16 @@ impl PendingList {
             messages: HashMap::<String, Message>::new(),
             commands: HashSet::<String>::new(),
             tasks: Vec::<Task>::new(),
+            receivers: Vec::<Sender<Arc<Message>>>::new(),
         }
     }
 }
 
-impl ServerSender {
+impl CommandSender {
     pub fn send<C: Command + Send + 'static>(
         self,
         mut command: C,
-    ) -> impl Future<Item = (ServerSender, Option<Message>), Error = ()> {
+    ) -> impl Future<Item = (CommandSender, Option<Message>), Error = ()> {
         let id = if let Some(id) = command.get_id() {
             id
         } else {
@@ -98,13 +101,13 @@ impl Hash for SendCommand {
 }
 
 impl Future for SendCommand {
-    type Item = (ServerSender, Option<Message>);
+    type Item = (CommandSender, Option<Message>);
     type Error = std::io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         if !self.has_response {
             return Ok(Async::Ready((
-                ServerSender { tx: self.tx.clone(), pending: self.pending.clone() },
+                CommandSender { tx: self.tx.clone(), pending: self.pending.clone() },
                 None,
             )));
         }
@@ -114,7 +117,7 @@ impl Future for SendCommand {
 
         if let Some(msg) = mpending.messages.remove(&self.id) {
             Ok(Async::Ready((
-                ServerSender { tx: self.tx.clone(), pending: self.pending.clone() },
+                CommandSender { tx: self.tx.clone(), pending: self.pending.clone() },
                 Some(msg),
             )))
         } else {
@@ -148,9 +151,18 @@ impl WeechatServer {
     pub fn send<C: Command + Send + 'static>(
         &self,
         command: C,
-    ) -> impl Future<Item = (ServerSender, Option<Message>), Error = ()> {
-        ServerSender { tx: self.command_tx.clone(), pending: self.pending.clone() }
+    ) -> impl Future<Item = (CommandSender, Option<Message>), Error = ()> {
+        CommandSender { tx: self.command_tx.clone(), pending: self.pending.clone() }
             .send(command)
+    }
+
+    pub fn sync(&self) -> Receiver<Arc<Message>> {
+        let (tx, rx) = mpsc::channel::<Arc<Message>>(0);
+
+        let mut mpending = self.pending.lock().unwrap();
+        mpending.receivers.push(tx);
+
+        rx
     }
 
     fn start(
@@ -200,15 +212,31 @@ impl WeechatServer {
     fn handle_message(
         msg: Message,
         pending: Arc<Mutex<PendingList>>,
-    ) -> Result<(), ()> {
-        let mut mpending = pending.lock().unwrap();
-        mpending.commands.remove(&msg.id);
-        mpending.messages.insert(msg.id.clone(), msg);
-        for task in mpending.tasks.iter() {
-            task.notify();
-        }
-        mpending.tasks.clear();
+    ) -> impl Future<Item = (), Error = ()> {
+        // Sync messages start with an _ (except pongs are wild)
+        let is_sync =
+            !msg.id.is_empty() && &msg.id[0..1] == "_" && msg.id != "_pong";
 
-        Ok(())
+        let mut mpending = pending.lock().unwrap();
+        let mut futs = Vec::<Box<Future<Item = (), Error = ()> + Send>>::new();
+
+        if is_sync {
+            let arc = Arc::<Message>::new(msg);
+
+            for receiver in &mpending.receivers {
+                futs.push(Box::new(
+                    receiver.clone().send(arc.clone()).then(|_| Ok(())),
+                ));
+            }
+        } else {
+            mpending.commands.remove(&msg.id);
+            mpending.messages.insert(msg.id.clone(), msg);
+            for task in mpending.tasks.iter() {
+                task.notify();
+            }
+            mpending.tasks.clear();
+        }
+
+        join_all(futs).then(|_| Ok(()))
     }
 }
