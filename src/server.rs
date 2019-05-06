@@ -1,7 +1,9 @@
 use crate::codec::WeechatCodec;
 use crate::command::Command;
 use crate::message::Message;
+use crate::sync::SyncMessage;
 use futures::future::*;
+use futures::stream::iter_ok;
 use futures::sync::mpsc;
 use futures::sync::mpsc::*;
 use futures::task::Task;
@@ -48,7 +50,7 @@ struct PendingList {
     messages: HashMap<String, Message>,
     commands: HashSet<String>,
     tasks: Vec<Task>,
-    receivers: Vec<Sender<Arc<Message>>>,
+    receivers: Vec<Sender<Arc<Vec<SyncMessage>>>>,
 }
 
 impl PendingList {
@@ -57,7 +59,7 @@ impl PendingList {
             messages: HashMap::<String, Message>::new(),
             commands: HashSet::<String>::new(),
             tasks: Vec::<Task>::new(),
-            receivers: Vec::<Sender<Arc<Message>>>::new(),
+            receivers: Vec::<Sender<Arc<Vec<SyncMessage>>>>::new(),
         }
     }
 }
@@ -156,8 +158,8 @@ impl WeechatServer {
             .send(command)
     }
 
-    pub fn sync(&self) -> Receiver<Arc<Message>> {
-        let (tx, rx) = mpsc::channel::<Arc<Message>>(0);
+    pub fn sync(&self) -> Receiver<Arc<Vec<SyncMessage>>> {
+        let (tx, rx) = mpsc::channel::<Arc<Vec<SyncMessage>>>(0);
 
         let mut mpending = self.pending.lock().unwrap();
         mpending.receivers.push(tx);
@@ -221,12 +223,19 @@ impl WeechatServer {
         let mut futs = Vec::<Box<Future<Item = (), Error = ()> + Send>>::new();
 
         if is_sync {
-            let arc = Arc::<Message>::new(msg);
+            let items = SyncMessage::parse(&msg).unwrap();
+            for vec in items {
+                let mut inner_futs =
+                    Vec::<Box<Future<Item = (), Error = ()> + Send>>::new();
+                let arc = Arc::<Vec<SyncMessage>>::new(vec);
 
-            for receiver in &mpending.receivers {
-                futs.push(Box::new(
-                    receiver.clone().send(arc.clone()).then(|_| Ok(())),
-                ));
+                for receiver in &mpending.receivers {
+                    inner_futs.push(Box::new(
+                        receiver.clone().send(arc.clone()).then(|_| Ok(())),
+                    ));
+                }
+
+                futs.push(Box::new(join_all(inner_futs).then(|_| Ok(()))));
             }
         } else {
             mpending.commands.remove(&msg.id);
@@ -237,6 +246,6 @@ impl WeechatServer {
             mpending.tasks.clear();
         }
 
-        join_all(futs).then(|_| Ok(()))
+        iter_ok(futs).for_each(|fut| fut)
     }
 }

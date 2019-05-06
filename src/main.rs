@@ -121,24 +121,22 @@ fn main() {
         })
         .map_err(|_| ())
         .join(
-            sync.for_each(|msg| {
-                let items = sync::SyncMessage::parse(&msg).unwrap();
-                for vec in items {
-                    for m in vec {
-                        match m {
-                            sync::SyncMessage::BufferLineAdded(bla) => {
-                                println!(
-                                    "<{}>: {}",
-                                    bla.prefix.to_str(),
-                                    bla.message.to_str()
-                                );
-                            }
-                            sync::SyncMessage::Nicklist(nl) => {
-                                println!("{:?}", nl);
-                            }
-                            _ => {
-                                println!("{:?}", m);
-                            }
+            sync.for_each(|syncs| {
+                println!("Sync message:");
+                for m in &*syncs {
+                    match m {
+                        sync::SyncMessage::BufferLineAdded(bla) => {
+                            println!(
+                                "<{}>: {}",
+                                bla.prefix.to_str(),
+                                bla.message.to_str()
+                            );
+                        }
+                        sync::SyncMessage::Nicklist(nl) => {
+                            println!("{:?}", nl);
+                        }
+                        _ => {
+                            println!("{:?}", m);
                         }
                     }
                 }
