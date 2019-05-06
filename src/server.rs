@@ -40,6 +40,7 @@ pub struct SendCommand {
 }
 
 // Helper class for sending commands in futures (for chaining)
+#[derive(Clone)]
 pub struct CommandSender {
     tx: Sender<BoxCommand>,
     pending: Arc<Mutex<PendingList>>,
@@ -158,6 +159,10 @@ impl WeechatServer {
             .send(command)
     }
 
+    pub fn sender(&self) -> CommandSender {
+        CommandSender { tx: self.command_tx.clone(), pending: self.pending.clone() }
+    }
+
     pub fn sync(&self) -> Receiver<Arc<Vec<SyncMessage>>> {
         let (tx, rx) = mpsc::channel::<Arc<Vec<SyncMessage>>>(0);
 
@@ -238,7 +243,9 @@ impl WeechatServer {
                 futs.push(Box::new(join_all(inner_futs).then(|_| Ok(()))));
             }
         } else {
-            mpending.commands.remove(&msg.id);
+            if !mpending.commands.remove(&msg.id) {
+                println!("Unexpected command response: {:?}", msg);
+            }
             mpending.messages.insert(msg.id.clone(), msg);
             for task in mpending.tasks.iter() {
                 task.notify();

@@ -339,7 +339,7 @@ impl Command for InputCommand {
     }
 
     fn has_response(&self) -> bool {
-        true
+        false
     }
 }
 

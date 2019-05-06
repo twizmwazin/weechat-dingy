@@ -6,8 +6,12 @@ extern crate rand;
 extern crate tokio;
 
 use crate::command::Command;
+use crate::server::CommandSender;
 use crate::server::WeechatServer;
+use futures::future::lazy;
+use futures::sync::mpsc;
 use std::env;
+use std::io;
 use std::net::ToSocketAddrs;
 use std::thread;
 use tokio::prelude::*;
@@ -39,6 +43,10 @@ fn main() {
         return;
     };
 
+    let (stdin_tx, stdin_rx) = mpsc::channel(0);
+    thread::spawn(|| read_stdin(stdin_tx));
+    let stdin_rx = stdin_rx.map_err(|_| panic!("errors not possible on rx"));
+
     println!("Addr: {:?}", server_addr);
     let server = WeechatServer::new(&server_addr);
 
@@ -49,8 +57,33 @@ fn main() {
     );
     init_command.encode(&mut std::io::stdout()).unwrap();
 
-    let sync = server.sync();
+    let send_task = stdin_rx
+        .fold(server.sender(), |tx, data| {
+            let fut: Box<Future<Item = CommandSender, Error = ()> + Send> =
+                if let Ok(s) = String::from_utf8(data) {
+                    if let Some(spot) = s.find(" ") {
+                        let (buffer, _) = s.split_at(spot);
+                        let (_, message) = s.split_at(spot + 1);
 
+                        let input_command = command::InputCommand::new(
+                            None,
+                            buffer.into(),
+                            message.into(),
+                        );
+                        input_command.encode(&mut std::io::stdout()).unwrap();
+                        Box::new(tx.send(input_command).map(|(tx, _)| tx))
+                    } else {
+                        Box::new(lazy(|| Ok(tx)))
+                    }
+                } else {
+                    Box::new(lazy(|| Ok(tx)))
+                };
+
+            fut
+        })
+        .map_err(|_| ());
+
+    let sync = server.sync();
     let init_task = server
         .send(init_command)
         .and_then(|(tx, _)| {
@@ -61,6 +94,13 @@ fn main() {
                 test_command.encode(&mut std::io::stdout()).unwrap();
                 let commands_task = tx
                     .send(test_command)
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
+
+                        let sync_command = command::SyncCommand::new(None, vec![]);
+                        sync_command.encode(&mut std::io::stdout()).unwrap();
+                        tx.send(sync_command)
+                    })
                     .and_then(|(tx, msg)| {
                         println!("Got message: {:?}", msg);
 
@@ -105,13 +145,6 @@ fn main() {
                         nick_command.encode(&mut std::io::stdout()).unwrap();
                         tx.send(nick_command)
                     })
-                    .and_then(|(tx, msg)| {
-                        println!("Got message: {:?}", msg);
-
-                        let sync_command = command::SyncCommand::new(None, vec![]);
-                        sync_command.encode(&mut std::io::stdout()).unwrap();
-                        tx.send(sync_command)
-                    })
                     .then(|_| Ok(()));
 
                 tokio::run(commands_task);
@@ -145,7 +178,26 @@ fn main() {
             })
             .map_err(|_| ()),
         )
+        .join(send_task)
         .then(|_| Ok(()));
 
     tokio::run(init_task);
+}
+
+// Our helper method which will read data from stdin and send it along the
+// sender provided.
+fn read_stdin(mut tx: mpsc::Sender<Vec<u8>>) {
+    let mut stdin = io::stdin();
+    loop {
+        let mut buf = vec![0; 1024];
+        let n = match stdin.read(&mut buf) {
+            Err(_) | Ok(0) => break,
+            Ok(n) => n,
+        };
+        buf.truncate(n);
+        tx = match tx.send(buf).wait() {
+            Ok(tx) => tx,
+            Err(_) => break,
+        };
+    }
 }
