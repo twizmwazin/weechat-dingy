@@ -1,0 +1,21 @@
+[package]
+name = "libdingy"
+version = "0.1.0"
+authors = ["Glenn Smith <couleeapps@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+backtrace = "0.3"
+byteorder = "1.2.7"
+derive_more = "0.13.0"
+libflate = "0.1"
+bytes = "0.4.12"
+rand = "0.6.5"
+
+[build-dependencies]
+cbindgen = "*"

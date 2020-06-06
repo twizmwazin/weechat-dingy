@@ -13,6 +13,7 @@ tokio = "0.1"
 bytes = "0.4.12"
 futures = "0.1.26"
 rand = "0.6.5"
+libdingy = { path = "libdingy" }
 
 [profile.release]
 debug = true

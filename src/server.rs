@@ -1,7 +1,7 @@
 use crate::codec::WeechatCodec;
-use crate::command::Command;
-use crate::message::Message;
-use crate::sync::SyncMessage;
+use libdingy::command::Command;
+use libdingy::message::Message;
+use libdingy::sync::SyncMessage;
 use futures::future::*;
 use futures::stream::iter_ok;
 use futures::sync::mpsc;

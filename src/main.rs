@@ -4,8 +4,10 @@ extern crate bytes;
 extern crate futures;
 extern crate rand;
 extern crate tokio;
+extern crate libdingy;
 
-use crate::command::Command;
+use libdingy::command::*;
+use libdingy::sync::*;
 use crate::server::CommandSender;
 use crate::server::WeechatServer;
 use futures::future::lazy;
@@ -15,12 +17,10 @@ use std::io;
 use std::net::ToSocketAddrs;
 use std::thread;
 use tokio::prelude::*;
+use libdingy::command::CommandType::Infolist;
 
 mod codec;
-pub mod command;
-pub mod message;
 pub mod server;
-pub mod sync;
 
 fn main() {
     let env_server_addr = env::var("server");
@@ -50,10 +50,10 @@ fn main() {
     println!("Addr: {:?}", server_addr);
     let server = WeechatServer::new(&server_addr);
 
-    let init_command = command::InitCommand::new(
+    let init_command = InitCommand::new(
         Some("login".into()),
         Some(password.to_owned()),
-        Some(command::CompressionType::None),
+        Some(CompressionType::None),
     );
     init_command.encode(&mut std::io::stdout()).unwrap();
 
@@ -65,7 +65,7 @@ fn main() {
                         let (buffer, _) = s.split_at(spot);
                         let (_, message) = s.split_at(spot + 1);
 
-                        let input_command = command::InputCommand::new(
+                        let input_command = InputCommand::new(
                             None,
                             buffer.into(),
                             message.into(),
@@ -90,21 +90,21 @@ fn main() {
             // Send stuff on separate thread.
             thread::spawn(move || {
                 // TODO: Move test somewhere else
-                let test_command = command::TestCommand::new(Some("aaa".into()));
+                let test_command = TestCommand::new(Some("aaa".into()));
                 test_command.encode(&mut std::io::stdout()).unwrap();
                 let commands_task = tx
                     .send(test_command)
                     .and_then(|(tx, msg)| {
                         println!("Got message: {:?}", msg);
 
-                        let sync_command = command::SyncCommand::new(None, vec![]);
+                        let sync_command = SyncCommand::new(None, vec![]);
                         sync_command.encode(&mut std::io::stdout()).unwrap();
                         tx.send(sync_command)
                     })
                     .and_then(|(tx, msg)| {
                         println!("Got message: {:?}", msg);
 
-                        let ping_command = command::PingCommand::new(
+                        let ping_command = PingCommand::new(
                             None,
                             Some(vec!["abcdefg".into()]),
                         );
@@ -114,20 +114,32 @@ fn main() {
                     .and_then(|(tx, msg)| {
                         println!("Got message: {:?}", msg);
 
+                        let inl_command = InfoListCommand::new(
+                            None,
+                            "buffer".into(),
+                            None,
+                            None
+                        );
+                        inl_command.encode(&mut std::io::stdout()).unwrap();
+                        tx.send(inl_command)
+                    })
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
+
                         let info_command =
-                            command::InfoCommand::new(None, "version".to_owned());
+                            InfoCommand::new(None, "version".to_owned());
                         info_command.encode(&mut std::io::stdout()).unwrap();
                         tx.send(info_command)
                     })
                     .and_then(|(tx, msg)| {
                         println!("Got message: {:?}", msg);
 
-                        let hdata_command = command::HdataCommand::new(
+                        let hdata_command = HdataCommand::new(
                             Some("HDATA HERE".to_owned()),
                             "buffer".into(),
                             (
                                 "gui_buffers".into(),
-                                Some(command::HdataCommandLength::Infinite),
+                                Some(HdataCommandLength::Infinite),
                             ),
                             vec![],
                             Some(vec!["number".into(), "name".into()]),
@@ -138,12 +150,17 @@ fn main() {
                     .and_then(|(tx, msg)| {
                         println!("Got message: {:?}", msg);
 
-                        let nick_command = command::NicklistCommand::new(
+                        let nick_command = NicklistCommand::new(
                             Some("nicks".to_owned()),
                             None,
                         );
                         nick_command.encode(&mut std::io::stdout()).unwrap();
                         tx.send(nick_command)
+                    })
+                    .and_then(|(tx, msg)| {
+                        println!("Got message: {:?}", msg);
+
+                        Ok(())
                     })
                     .then(|_| Ok(()));
 
@@ -158,14 +175,14 @@ fn main() {
                 println!("Sync message:");
                 for m in &*syncs {
                     match m {
-                        sync::SyncMessage::BufferLineAdded(bla) => {
+                        SyncMessage::BufferLineAdded(bla) => {
                             println!(
                                 "<{}>: {}",
                                 bla.prefix.to_str(),
                                 bla.message.to_str()
                             );
                         }
-                        sync::SyncMessage::Nicklist(nl) => {
+                        SyncMessage::Nicklist(nl) => {
                             println!("{:?}", nl);
                         }
                         _ => {

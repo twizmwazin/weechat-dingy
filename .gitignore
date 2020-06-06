@@ -12,3 +12,4 @@ Cargo.lock
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
+libdingy/target
