@@ -43,7 +43,7 @@ impl Clone for CommandType {
 pub trait Command {
     fn get_id(&self) -> Option<String>;
     fn set_id(&mut self, id: Option<String>);
-    fn encode(&self, out: &mut Write) -> Result<usize, Error>;
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error>;
     fn has_response(&self) -> bool;
 }
 
@@ -62,6 +62,7 @@ where
 }
 
 #[derive(Copy)]
+#[repr(C)]
 pub enum CompressionType {
     None,
     Zlib,
@@ -90,7 +91,7 @@ pub struct InitCommand {
 }
 
 impl InitCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("init");
         if self.password.is_some() || self.compression.is_some() {
@@ -127,7 +128,7 @@ impl Command for InitCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -138,7 +139,7 @@ impl Command for InitCommand {
 
 pub enum HdataCommandLength {
     Infinite,
-    Finite(u32),
+    Finite(i32),
 }
 
 #[derive(Constructor)]
@@ -151,7 +152,7 @@ pub struct HdataCommand {
 }
 
 impl HdataCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res = format!("{}hdata {}:{}", res, self.hdata, self.pointer.0);
 
@@ -191,7 +192,7 @@ impl Command for HdataCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -207,7 +208,7 @@ pub struct InfoCommand {
 }
 
 impl InfoCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let res = format!("{}info {}\n", handle_id(&self.id), self.name);
         out.write(res.as_bytes())
     }
@@ -222,7 +223,7 @@ impl Command for InfoCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -240,7 +241,7 @@ pub struct InfoListCommand {
 }
 
 impl InfoListCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res = format!("{}infolist {}", res, &self.name);
         if self.pointer.is_some() {
@@ -265,7 +266,7 @@ impl Command for InfoListCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -281,7 +282,7 @@ pub struct NicklistCommand {
 }
 
 impl NicklistCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("nicklist");
         if self.buffer.is_some() {
@@ -301,7 +302,7 @@ impl Command for NicklistCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -318,7 +319,7 @@ pub struct InputCommand {
 }
 
 impl InputCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let res =
             format!("{}input {} {}\n", handle_id(&self.id), self.buffer, self.data);
         out.write(res.as_bytes())
@@ -334,7 +335,7 @@ impl Command for InputCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -343,6 +344,8 @@ impl Command for InputCommand {
     }
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub enum SyncOption {
     Buffers,
     Upgrade,
@@ -368,7 +371,7 @@ pub struct SyncCommand {
 }
 
 impl SyncCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let mut res: String = handle_id(&self.id);
         res = format!("{}sync", res);
         if !self.args.is_empty() {
@@ -401,7 +404,7 @@ impl Command for SyncCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -417,7 +420,7 @@ pub struct DesyncCommand {
 }
 
 impl DesyncCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let mut res: String = handle_id(&self.id);
         res = format!("{}desync", res);
         if !self.args.is_empty() {
@@ -450,7 +453,7 @@ impl Command for DesyncCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -465,7 +468,7 @@ pub struct TestCommand {
 }
 
 impl TestCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let res = format!("{}test\n", handle_id(&self.id));
         out.write(res.as_bytes())
     }
@@ -480,7 +483,7 @@ impl Command for TestCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -496,7 +499,7 @@ pub struct PingCommand {
 }
 
 impl PingCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let mut res = handle_id(&self.id);
         res.push_str("ping");
         if self.arguments.is_some() {
@@ -518,7 +521,7 @@ impl Command for PingCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 
@@ -533,7 +536,7 @@ pub struct QuitCommand {
 }
 
 impl QuitCommand {
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         let res = format!("{}quit\n", handle_id(&self.id));
         out.write(res.as_bytes())
     }
@@ -548,7 +551,7 @@ impl Command for QuitCommand {
         self.id = id;
     }
 
-    fn encode(&self, out: &mut Write) -> Result<usize, Error> {
+    fn encode(&self, out: &mut dyn Write) -> Result<usize, Error> {
         self.encode(out)
     }
 

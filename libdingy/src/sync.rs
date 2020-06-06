@@ -1,7 +1,6 @@
 use crate::message;
 use backtrace::Backtrace;
 use message::WeechatString;
-use std::collections::BTreeMap;
 use std::io::Error;
 
 #[derive(Debug)]
@@ -239,7 +238,7 @@ sync_struct!(BufferOpened {
     short_name: WeechatString;
     nicklist: i32;
     title: WeechatString;
-    local_variables: BTreeMap<WeechatString, WeechatString>;
+    local_variables: Vec<(WeechatString, WeechatString)>;
     prev_buffer: u128;
     next_buffer: u128;
 });
@@ -283,7 +282,7 @@ sync_struct!(BufferRenamed {
     number: i32;
     full_name: WeechatString;
     short_name: WeechatString;
-    local_variables: BTreeMap<WeechatString, WeechatString>;
+    local_variables: Vec<(WeechatString, WeechatString)>;
 });
 
 sync_struct!(BufferTitleChanged {
@@ -306,19 +305,19 @@ sync_struct!(BufferTypeChanged {
 sync_struct!(BufferLocalvarAdded {
     number: i32;
     full_name: WeechatString;
-    local_variables: BTreeMap<WeechatString, WeechatString>;
+    local_variables: Vec<(WeechatString, WeechatString)>;
 });
 
 sync_struct!(BufferLocalvarChanged {
     number: i32;
     full_name: WeechatString;
-    local_variables: BTreeMap<WeechatString, WeechatString>;
+    local_variables: Vec<(WeechatString, WeechatString)>;
 });
 
 sync_struct!(BufferLocalvarRemoved {
     number: i32;
     full_name: WeechatString;
-    local_variables: BTreeMap<WeechatString, WeechatString>;
+    local_variables: Vec<(WeechatString, WeechatString)>;
 });
 
 sync_struct!(BufferLineAdded {
